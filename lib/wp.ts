@@ -45,7 +45,9 @@ export async function createDraftPost(input: WpPostInput): Promise<WpPostResult>
     ...(input.date ? { date: input.date } : {}),
   };
 
-  const res = await fetch(`${base}/wp-json/wp/v2/posts`, {
+  // kawacoins.com はパーマリンク未設定のため ?rest_route= 形式を使用
+  const url = `${base}/?rest_route=/wp/v2/posts`;
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
