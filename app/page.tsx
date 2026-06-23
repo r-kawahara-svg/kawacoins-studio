@@ -1,65 +1,396 @@
-import Image from "next/image";
+import { db } from "@/db";
+import { topics, articles } from "@/db/schema";
+import { eq, count } from "drizzle-orm";
+import Link from "next/link";
 
-export default function Home() {
+export default async function DashboardPage() {
+  // Real DB counts
+  const [topicCount] = await db.select({ count: count() }).from(topics);
+  const [gateCount] = await db
+    .select({ count: count() })
+    .from(articles)
+    .where(eq(articles.status, "gate"));
+  const [publishedCount] = await db
+    .select({ count: count() })
+    .from(articles)
+    .where(eq(articles.status, "published"));
+
+  // Gate articles list (status = 'gate', most recent 10)
+  const gateArticles = await db
+    .select({ id: articles.id, title: articles.title, createdAt: articles.createdAt })
+    .from(articles)
+    .where(eq(articles.status, "gate"))
+    .limit(10);
+
+  // Pipeline strip counts
+  const [draftCount] = await db
+    .select({ count: count() })
+    .from(articles)
+    .where(eq(articles.status, "draft"));
+  const [scheduledCount] = await db
+    .select({ count: count() })
+    .from(articles)
+    .where(eq(articles.status, "scheduled"));
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div style={{ padding: "26px 30px 60px", maxWidth: 1000 }}>
+      <div
+        style={{
+          fontSize: 10.5,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "#697587",
+          fontWeight: 600,
+          fontFamily: "monospace",
+          marginBottom: 20,
+        }}
+      >
+        ダッシュボード
+      </div>
+
+      {/* KPI cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3,1fr)",
+          gap: 18,
+          marginBottom: 24,
+        }}
+      >
+        {[
+          {
+            label: "ネタ候補",
+            value: topicCount.count,
+            unit: "件",
+            href: "/topics",
+            color: "#161d2b",
+          },
+          {
+            label: "判断待ち",
+            value: gateCount.count,
+            unit: "件",
+            color: "#b07d2e",
+          },
+          {
+            label: "公開済み",
+            value: publishedCount.count,
+            unit: "件",
+            color: "#0f766b",
+          },
+        ].map((k) => (
+          <div
+            key={k.label}
+            style={{
+              background: "#fff",
+              border: "1px solid #dce1e8",
+              borderRadius: 14,
+              padding: "18px 20px",
+              boxShadow: "0 1px 2px rgba(22,29,43,.04)",
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#697587" }}>{k.label}</div>
+            <div
+              style={{
+                fontFamily: "monospace",
+                fontWeight: 800,
+                fontSize: 30,
+                marginTop: 8,
+                color: k.color,
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              {k.value}
+              <span
+                style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "#697587",
+                  marginLeft: 2,
+                }}
+              >
+                {k.unit}
+              </span>
+            </div>
+            {k.href && (
+              <Link
+                href={k.href}
+                style={{
+                  fontSize: 12,
+                  color: "#0f766b",
+                  marginTop: 8,
+                  display: "block",
+                }}
+              >
+                一覧を見る →
+              </Link>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pipeline strip */}
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid #dce1e8",
+          borderRadius: 14,
+          padding: "16px 20px",
+          marginBottom: 24,
+          display: "flex",
+          gap: 0,
+          alignItems: "stretch",
+          boxShadow: "0 1px 2px rgba(22,29,43,.04)",
+        }}
+      >
+        {[
+          {
+            label: "ネタキュー",
+            count: topicCount.count,
+            color: "#697587",
+            href: "/topics",
+          },
+          { arrow: true },
+          {
+            label: "下書き生成",
+            count: draftCount.count,
+            color: "#2b5e8c",
+          },
+          { arrow: true },
+          {
+            label: "判断ゲート",
+            count: gateCount.count,
+            color: "#b07d2e",
+          },
+          { arrow: true },
+          {
+            label: "スケジュール済み",
+            count: scheduledCount.count,
+            color: "#7a5ea8",
+          },
+          { arrow: true },
+          {
+            label: "公開済み",
+            count: publishedCount.count,
+            color: "#0f766b",
+          },
+        ].map((step, i) => {
+          if ("arrow" in step) {
+            return (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 8px",
+                  color: "#dce1e8",
+                  fontSize: 18,
+                }}
+              >
+                →
+              </div>
+            );
+          }
+          return (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                textAlign: "center",
+                padding: "8px 4px",
+                borderRadius: 8,
+              }}
             >
-              Learning
-            </a>{" "}
-            center.
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontWeight: 800,
+                  fontSize: 22,
+                  color: step.color,
+                }}
+              >
+                {step.count}
+              </div>
+              <div style={{ fontSize: 10.5, color: "#697587", marginTop: 2 }}>
+                {step.href ? (
+                  <Link href={step.href} style={{ color: "#697587" }}>
+                    {step.label}
+                  </Link>
+                ) : (
+                  step.label
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Gate article list */}
+      {gateArticles.length > 0 && (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #dce1e8",
+            borderRadius: 14,
+            marginBottom: 24,
+            boxShadow: "0 1px 2px rgba(22,29,43,.04)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "14px 20px",
+              borderBottom: "1px solid #dce1e8",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              判断待ち記事
+            </span>
+            <span
+              style={{
+                marginLeft: "auto",
+                background: "#fef3c7",
+                color: "#92400e",
+                borderRadius: 6,
+                padding: "2px 8px",
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: "monospace",
+              }}
+            >
+              {gateArticles.length}件
+            </span>
+          </div>
+          {gateArticles.map((a) => (
+            <div
+              key={a.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "12px 20px",
+                borderBottom: "1px solid #dce1e8",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#b07d2e",
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1, fontWeight: 500, fontSize: 13, color: "#161d2b" }}>
+                {a.title}
+              </div>
+              {a.createdAt && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#697587",
+                    fontFamily: "monospace",
+                    flexShrink: 0,
+                  }}
+                >
+                  {new Date(a.createdAt).toLocaleDateString("ja-JP")}
+                </div>
+              )}
+              <Link
+                href={`/articles/${a.id}`}
+                style={{
+                  fontSize: 12,
+                  color: "#0f766b",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                判断入力 →
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Judgment gate explanation */}
+      <div
+        style={{
+          background: "#161d2b",
+          color: "#dfe5ee",
+          borderRadius: 14,
+          padding: "20px 22px",
+          display: "flex",
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 10,
+            background: "rgba(15,118,107,.25)",
+            color: "#5fd3c5",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            fontSize: 20,
+          }}
+        >
+          🛡
+        </div>
+        <div>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 14,
+              color: "#fff",
+              marginBottom: 5,
+            }}
+          >
+            なぜ「判断ゲート」があるのか
+          </div>
+          <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "#a9b4c4" }}>
+            Googleは AI 利用そのものは罰しないが、
+            <strong style={{ color: "#fff" }}>
+              一次体験と判断の乗らない量産
+            </strong>
+            を弾く。あなたの実トレード視点を1記事ずつ注入することが、スロップとの唯一の差になる。
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+
+      {/* Revenue Phase 2 placeholder */}
+      <div
+        style={{
+          background: "#fff",
+          border: "1.5px dashed #dce1e8",
+          borderRadius: 14,
+          padding: "24px 24px",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "monospace",
+            fontWeight: 700,
+            fontSize: 13,
+            color: "#697587",
+            marginBottom: 6,
+          }}
+        >
+          収益ダッシュボード（Phase 2）
         </div>
-      </main>
+        <div style={{ fontSize: 12, color: "#a9b4c4" }}>
+          AdSense・アフィリエイト収益の集計・グラフはPhase 2で実装予定です
+        </div>
+      </div>
     </div>
   );
 }
