@@ -30,8 +30,8 @@ export async function POST(
 
   if (!judgment || !isJudgmentComplete(judgment)) {
     return NextResponse.json(
-      { error: "Judgment gate not complete" },
-      { status: 400 }
+      { error: "判断ゲートが未完了です" },
+      { status: 422 }
     );
   }
 

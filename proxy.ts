@@ -2,6 +2,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // APIルートはsupabase呼び出しなしでスルー（セッション更新不要、自前でガード）
+  if (pathname.startsWith('/api/') || pathname.startsWith('/auth/')) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -22,7 +29,6 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const { pathname } = request.nextUrl;
 
   if (!user && pathname !== '/login') {
     return NextResponse.redirect(new URL('/login', request.url));
