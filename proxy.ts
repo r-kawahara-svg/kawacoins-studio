@@ -1,7 +1,7 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -24,25 +24,20 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  // 未認証 → /login へ
-  if (!user && pathname !== "/login") {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (!user && pathname !== '/login') {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
-
-  // 認証済みだが許可メール以外 → /login へ（サインアウト済みとして扱う）
   if (user && user.email !== process.env.ALLOWED_EMAIL) {
     await supabase.auth.signOut();
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL('/login', request.url));
   }
-
-  // 認証済みで /login にいる場合 → / へ
-  if (user && pathname === "/login") {
-    return NextResponse.redirect(new URL("/", request.url));
+  if (user && pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };
