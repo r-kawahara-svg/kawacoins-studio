@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { articles, judgments } from "@/db/schema";
+import { judgments } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { publishArticleById, PublishError } from "@/lib/publish";
 
 export async function updateJudgment(formData: FormData) {
   const articleId = formData.get("articleId") as string;
@@ -23,12 +24,15 @@ export async function updateJudgment(formData: FormData) {
 
 export async function publishArticle(formData: FormData) {
   const articleId = formData.get("articleId") as string;
-
-  await db
-    .update(articles)
-    .set({ status: "published", publishedAt: new Date() })
-    .where(eq(articles.id, articleId));
-
+  try {
+    await publishArticleById(articleId);
+  } catch (e) {
+    if (e instanceof PublishError) {
+      throw new Error(e.userMessage);
+    }
+    throw e;
+  }
   revalidatePath(`/articles/${articleId}`);
+  revalidatePath("/review");
   revalidatePath("/");
 }

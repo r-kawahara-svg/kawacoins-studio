@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
-import { topics, articles, judgments } from "@/db/schema";
+import { topics, articles, judgments, experiences } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getTemplate } from "@/lib/templates";
 
@@ -55,6 +55,15 @@ export async function POST(request: NextRequest) {
         .replace("{CTA_THEME}", tmpl.ctaThemes[0] ?? "証券口座")
     : null;
 
+  const t5Guardrails = topic.template === "T5" ? `
+【T5専用ガードレール（最重要）】
+- [EXPERIENCE:失敗の骨子] に書かれた事実（銘柄/時期/損失額/行動）を一切改変・追加・脚色しない。
+  AIの役割は「構成・表現・分かりやすさ」の向上のみ。新たな失敗エピソードを創作しない。
+- 膨らませ強度=中: 構成立て・敗因の表化・教訓の言語化まで行う。性格付けや過度なストーリー化は不可。
+- 反省を読者が再現可能な教訓に変換する。感情の煽り・自虐の過剰演出は不可。
+- 一人称はユーザーの語り口（「私は」「自分は」）を保つ。
+` : "";
+
   const systemPrompt = `あなたは個人投資家向けの金融記事ライターです。
 以下のルールを厳守してください：
 - 断定を避け投資助言にならない表現を使う（「〜と考えられる」「一例として」「〜の可能性がある」など）
@@ -63,7 +72,7 @@ export async function POST(request: NextRequest) {
   テーマ名は必ず以下の統制語彙から記事内容に合うものだけを選ぶ（無理に全部使わない）：
   ${AFFILIATE_VOCAB}
   ※表記はこの通り（小文字/日本語を厳守）。
-${GUARDRAILS}`;
+${GUARDRAILS}${t5Guardrails}`;
 
   const userPrompt = skeleton
     ? `以下の骨格に従って、投資家向け記事を3000文字程度で完成させてください。
@@ -175,6 +184,9 @@ JSON のみ返してください。`;
   const titleMatch = bodyMd.match(/^#{1,2}\s+(.+)$/m);
   const articleTitle = titleMatch ? titleMatch[1] : topic.title;
 
+  // テンプレート記事は 'review'（人の承認前提）、旧フロー記事は 'gate'
+  const initialStatus = topic.template ? "review" : "gate";
+
   const [article] = await db
     .insert(articles)
     .values({
@@ -185,17 +197,32 @@ JSON のみ返してください。`;
       template: topic.template,
       visuals,
       faq,
-      status: "gate",
+      status: initialStatus,
     })
     .returning();
 
-  await db.insert(judgments).values({
-    articleId: article.id,
-    tradeView: null,
-    position: null,
-    uniqueTake: null,
-    completed: false,
-  });
+  if (!topic.template) {
+    // 旧フロー: judgment レコードを作成
+    await db.insert(judgments).values({
+      articleId: article.id,
+      tradeView: null,
+      position: null,
+      uniqueTake: null,
+      completed: false,
+    });
+  } else {
+    // 新フロー: experienceSlots の空レコードを作成
+    const tmplDef = (await import("@/lib/templates")).getTemplate(topic.template);
+    if (tmplDef && tmplDef.experienceSlots.length > 0) {
+      for (const label of tmplDef.experienceSlots) {
+        await db.insert(experiences).values({
+          articleId: article.id,
+          label,
+          completed: false,
+        });
+      }
+    }
+  }
 
   await db
     .update(topics)

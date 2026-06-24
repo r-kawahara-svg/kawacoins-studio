@@ -32,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <a href="/" style={{ color: "#aeb8c8", fontSize: 13, padding: "6px 12px", borderRadius: 7 }}>ダッシュボード</a>
               <a href="/topics" style={{ color: "#aeb8c8", fontSize: 13, padding: "6px 12px", borderRadius: 7 }}>ネタキュー</a>
               <a href="/affiliates" style={{ color: "#aeb8c8", fontSize: 13, padding: "6px 12px", borderRadius: 7 }}>アフィリ</a>
+              <a href="/review" style={{ color: "#aeb8c8", fontSize: 13, padding: "6px 12px", borderRadius: 7 }}>レビュー</a>
             </nav>
             <div style={{ flex: 1 }} />
             <form action={signOut}>

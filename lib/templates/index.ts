@@ -1,12 +1,12 @@
 /**
- * 記事テンプレート定義 T1〜T4
+ * 記事テンプレート定義 T1〜T5
  * skeleton: Claude に渡す骨格プロンプト（プレースホルダ入り）
- * experienceSlots: 体験談・感想の入力項目
- * requiredVisuals: 生成すべき図表の種類 (kind: 'table'|'steps'|'chart')
+ * experienceSlots: 体験談・感想の入力項目（必須入力）
+ * requiredVisuals: 生成すべき図表の種類
  * ctaThemes: [AFFILIATE:xxx] に使う統制語彙
  */
 export interface ArticleTemplate {
-  id: "T1" | "T2" | "T3" | "T4";
+  id: "T1" | "T2" | "T3" | "T4" | "T5";
   name: string;
   skeleton: string;
   experienceSlots: string[];
@@ -40,9 +40,7 @@ export const templates: Record<string, ArticleTemplate> = {
 ## まとめ
 この記事はAIの下書きをもとに運営者が編集しています。金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: ["きっかけ・背景", "使用感・メリット", "デメリット・気になった点"],
-    requiredVisuals: [
-      { kind: "table", label: "費用比較" },
-    ],
+    requiredVisuals: [{ kind: "table", label: "費用比較" }],
     ctaThemes: ["証券口座", "nisa", "ideco", "投資信託"],
   },
 
@@ -70,9 +68,7 @@ export const templates: Record<string, ArticleTemplate> = {
 ## まとめ
 この記事はAIの下書きをもとに運営者が編集しています。金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: ["選び方のアドバイス"],
-    requiredVisuals: [
-      { kind: "table", label: "サービス比較" },
-    ],
+    requiredVisuals: [{ kind: "table", label: "サービス比較" }],
     ctaThemes: ["証券口座", "nisa", "投資信託", "ipo"],
   },
 
@@ -98,9 +94,7 @@ export const templates: Record<string, ArticleTemplate> = {
 ## まとめ
 この記事はAIの下書きをもとに運営者が編集しています。金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: [],
-    requiredVisuals: [
-      { kind: "steps", label: "開設・登録手順" },
-    ],
+    requiredVisuals: [{ kind: "steps", label: "開設・登録手順" }],
     ctaThemes: ["証券口座", "nisa", "ideco"],
   },
 
@@ -130,10 +124,45 @@ export const templates: Record<string, ArticleTemplate> = {
 ## 免責事項
 この記事はAIの下書きをもとに運営者が編集しています。特定銘柄への投資を推奨するものではなく、金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: ["筆者の見解・注目ポイント"],
-    requiredVisuals: [
-      { kind: "chart", label: "業績推移" },
-    ],
+    requiredVisuals: [{ kind: "chart", label: "業績推移" }],
     ctaThemes: ["個別株", "証券口座", "スイング"],
+  },
+
+  T5: {
+    id: "T5",
+    name: "失敗談・教訓型",
+    skeleton: `# {TITLE}
+
+## はじめに ― 先に結末をお伝えします
+[EXPERIENCE:失敗の骨子]
+
+> **要点まとめ**: AIが骨子から教訓を整理します。
+
+## 何が起きたか（時系列）
+[STEPS:時系列]
+
+## 何が悪かったか（敗因の分解）
+[TABLE:敗因分解]
+
+## ここから学んだこと
+[EXPERIENCE:今ならどうするか]
+
+## どう改善したか
+改善後の行動・考え方の変化を記載する。
+
+[AFFILIATE:{CTA_THEME}]
+
+## 同じ失敗を避けるには
+[FAQ]
+
+## まとめ
+この記事はAIの下書きをもとに運営者が編集しています（運営者の実体験に基づいています）。特定銘柄への投資を推奨するものではなく、金融商品への投資には元本割れのリスクがあります。`,
+    experienceSlots: ["失敗の骨子", "今ならどうするか"],
+    requiredVisuals: [
+      { kind: "steps", label: "時系列" },
+      { kind: "table", label: "敗因分解" },
+    ],
+    ctaThemes: ["証券口座", "スイング", "個別株"],
   },
 };
 

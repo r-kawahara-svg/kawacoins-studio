@@ -10,7 +10,7 @@ export const topics = pgTable("topics", {
   revenueScore: integer("revenue_score").default(3), // 1-5
   competition: text("competition").default("mid"),   // 'low' | 'mid' | 'high'
   status: text("status").notNull().default("new"),   // 'new'|'drafting'|'drafted'|'dismissed'
-  template: text("template"),                        // 'T1'|'T2'|'T3'|'T4'
+  template: text("template"),                        // 'T1'|'T2'|'T3'|'T4'|'T5'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -21,10 +21,10 @@ export const articles = pgTable("articles", {
   bodyMd: text("body_md").notNull(),          // [JUDGMENT:*] プレースホルダ付きMarkdown
   aiModel: text("ai_model"),
   affiliateSlots: jsonb("affiliate_slots").default("[]"), // [{programId, anchorText, position}]
-  template: text("template"),                            // 'T1'|'T2'|'T3'|'T4'
+  template: text("template"),                            // 'T1'|'T2'|'T3'|'T4'|'T5'
   visuals: jsonb("visuals").default("[]"),               // [{id, kind, title, caption, source, ...}]
   faq: jsonb("faq").default("[]"),                       // [{question, answer}]
-  status: text("status").notNull().default("gate"), // 'draft'|'gate'|'scheduled'|'published'
+  status: text("status").notNull().default("gate"), // 'gate'|'review'|'approved'|'published'|'rejected'
   wpPostId: integer("wp_post_id"),
   scheduledAt: timestamp("scheduled_at"),
   publishedAt: timestamp("published_at"),
@@ -53,6 +53,17 @@ export const affiliatePrograms = pgTable("affiliate_programs", {
   note: text("note"),
   priority: integer("priority").default(100), // 低いほど優先（10=主軸, 20=通常text, 50=banner, 90=暫定）
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// 体験入力テーブル（テンプレート記事のexperienceSlots対応）
+export const experiences = pgTable("experiences", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  articleId: uuid("article_id").references(() => articles.id).notNull(),
+  label: text("label").notNull(),           // experienceSlots の各ラベル
+  choice: text("choice"),                   // 選択肢（満足/ふつう/不満 等、任意）
+  note: text("note"),                       // 自由記述（失敗の骨子等）
+  completed: boolean("completed").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Phase 2用スキーマ（UIは作らない）
