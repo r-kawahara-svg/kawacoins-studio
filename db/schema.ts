@@ -47,6 +47,7 @@ export const affiliatePrograms = pgTable("affiliate_programs", {
   active: boolean("active").default(true),
   adType: text("ad_type").default("text"),   // 'text' | 'banner'
   note: text("note"),
+  priority: integer("priority").default(100), // 低いほど優先（10=主軸, 20=通常text, 50=banner, 90=暫定）
   createdAt: timestamp("created_at").defaultNow(),
 });
 

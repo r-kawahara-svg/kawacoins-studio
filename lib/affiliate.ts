@@ -13,6 +13,7 @@ interface AffiliateRow {
   htmlSnippet: string;
   themes: string[];
   adType: string | null;
+  priority: number | null;
 }
 
 /**
@@ -27,12 +28,14 @@ export async function buildAffiliateMap(): Promise<Map<string, AffiliateRow>> {
       htmlSnippet: affiliatePrograms.htmlSnippet,
       themes: affiliatePrograms.themes,
       adType: affiliatePrograms.adType,
+      priority: affiliatePrograms.priority,
     })
     .from(affiliatePrograms)
     .where(eq(affiliatePrograms.active, true))
     .orderBy(
-      // text 優先（text=0, banner=1 でソート）、同条件なら作成順
+      // ① text優先（text=0, banner=1）→ ② priority昇順 → ③ createdAt昇順
       sql`CASE WHEN ${affiliatePrograms.adType} = 'text' THEN 0 ELSE 1 END`,
+      affiliatePrograms.priority,
       affiliatePrograms.createdAt
     );
 
@@ -82,15 +85,16 @@ export async function replaceAffiliatePlaceholders(bodyMd: string): Promise<stri
  * テーマ→広告の解決マップをデバッグ用に返す（検証スクリプト用）。
  */
 export async function resolveAllThemes(): Promise<
-  Record<string, { name: string; adType: string | null; a8mat: string } | null>
+  Record<string, { name: string; adType: string | null; priority: number | null; a8mat: string } | null>
 > {
   const map = await buildAffiliateMap();
-  const result: Record<string, { name: string; adType: string | null; a8mat: string } | null> = {};
+  const result: Record<string, { name: string; adType: string | null; priority: number | null; a8mat: string } | null> = {};
   for (const [theme, row] of map.entries()) {
     const a8matMatch = row.htmlSnippet.match(/a8mat=([A-Z0-9+]+)/);
     result[theme] = {
       name: row.name,
       adType: row.adType,
+      priority: row.priority,
       a8mat: a8matMatch ? a8matMatch[1] : "unknown",
     };
   }

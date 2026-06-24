@@ -87,7 +87,7 @@ export const affiliateSeeds: AffiliateSeed[] = [
     name: "ALTERNA（三井物産デジタル証券）",
     asp: "a8",
     adType: 'text',
-    themes: ["投資信託"],
+    themes: [], // 暫定のため自動挿入対象外（active=trueは維持、手動利用は可）
     active: true,
     payout: null,
     note: "暫定タグ。オルタナ資産。要見直し",
@@ -99,7 +99,7 @@ export const affiliateSeeds: AffiliateSeed[] = [
     name: "ALTERNA（三井物産デジタル証券）",
     asp: "a8",
     adType: 'banner',
-    themes: ["投資信託"],
+    themes: [], // 暫定のため自動挿入対象外
     active: true,
     payout: null,
     note: "暫定。300x250",
