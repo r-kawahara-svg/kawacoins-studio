@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { marked } from "marked";
 import { createDraftPost, injectAffiliateRel } from "@/lib/wp";
 import { isJudgmentComplete } from "@/lib/gate";
+import { replaceAffiliatePlaceholders } from "@/lib/affiliate";
 
 export async function POST(
   _req: NextRequest,
@@ -12,7 +13,6 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  // Fetch article
   const [article] = await db
     .select()
     .from(articles)
@@ -22,7 +22,6 @@ export async function POST(
     return NextResponse.json({ error: "Article not found" }, { status: 404 });
   }
 
-  // Fetch judgment
   const [judgment] = await db
     .select()
     .from(judgments)
@@ -35,27 +34,26 @@ export async function POST(
     );
   }
 
-  // Substitute JUDGMENT placeholders with actual judgment text
+  // JUDGMENT プレースホルダ置換
   let bodyMd = article.bodyMd
     .replace(/\[JUDGMENT:trade\]/g, judgment.tradeView ?? "")
     .replace(/\[JUDGMENT:position\]/g, judgment.position ?? "")
     .replace(/\[JUDGMENT:take\]/g, judgment.uniqueTake ?? "");
 
-  // Remove AFFILIATE placeholders (real links handled separately in Phase 2)
-  bodyMd = bodyMd.replace(/\[AFFILIATE:[^\]]+\]/g, "");
+  // AFFILIATE プレースホルダ置換（DB から広告取得、text優先）
+  bodyMd = await replaceAffiliatePlaceholders(bodyMd);
 
-  // Convert to HTML
+  // Markdown → HTML
   const rawHtml = await marked(bodyMd);
+  // 通常リンクにも rel="sponsored nofollow" を付与（既存の injectAffiliateRel）
   const html = injectAffiliateRel(rawHtml);
 
-  // Create WordPress draft
   const wpResult = await createDraftPost({
     title: article.title,
     content: html,
     status: "draft",
   });
 
-  // Update article status and wpPostId
   await db
     .update(articles)
     .set({

@@ -45,6 +45,9 @@ export const affiliatePrograms = pgTable("affiliate_programs", {
   htmlSnippet: text("html_snippet").notNull(),
   payout: integer("payout"),
   active: boolean("active").default(true),
+  adType: text("ad_type").default("text"),   // 'text' | 'banner'
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Phase 2用スキーマ（UIは作らない）
