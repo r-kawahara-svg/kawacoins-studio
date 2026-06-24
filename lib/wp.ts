@@ -66,6 +66,58 @@ export async function createDraftPost(input: WpPostInput): Promise<WpPostResult>
 }
 
 /**
+ * Uploads a media file (PNG buffer) to WordPress and returns the media ID.
+ */
+export async function uploadMedia(png: Buffer, filename: string): Promise<number> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+
+  const url = `${base}/?rest_route=/wp/v2/media`;
+  const formData = new FormData();
+  formData.append("file", new Blob([new Uint8Array(png)], { type: "image/png" }), filename);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: auth,
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`WordPress media upload error ${res.status}: ${text}`);
+  }
+
+  const data = (await res.json()) as { id: number };
+  return data.id;
+}
+
+/**
+ * Sets the featured_image (eyecatch) on a WordPress post.
+ */
+export async function setFeaturedMedia(postId: number, mediaId: number): Promise<void> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+
+  const url = `${base}/?rest_route=/wp/v2/posts/${postId}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: auth,
+    },
+    body: JSON.stringify({ featured_media: mediaId }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`WordPress setFeaturedMedia error ${res.status}: ${text}`);
+  }
+}
+
+/**
  * Injects rel="sponsored nofollow" into all <a> tags for affiliate compliance.
  */
 export function injectAffiliateRel(html: string): string {

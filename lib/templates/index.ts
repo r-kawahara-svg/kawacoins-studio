@@ -38,7 +38,7 @@ export const templates: Record<string, ArticleTemplate> = {
 [AFFILIATE:{CTA_THEME}]
 
 ## まとめ
-この記事はAIの下書きをもとに運営者が編集しています。金融商品への投資には元本割れのリスクがあります。`,
+金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: ["きっかけ・背景", "使用感・メリット", "デメリット・気になった点"],
     requiredVisuals: [{ kind: "table", label: "費用比較" }],
     ctaThemes: ["証券口座", "nisa", "ideco", "投資信託"],
@@ -66,7 +66,7 @@ export const templates: Record<string, ArticleTemplate> = {
 [AFFILIATE:{CTA_THEME}]
 
 ## まとめ
-この記事はAIの下書きをもとに運営者が編集しています。金融商品への投資には元本割れのリスクがあります。`,
+金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: ["選び方のアドバイス"],
     requiredVisuals: [{ kind: "table", label: "サービス比較" }],
     ctaThemes: ["証券口座", "nisa", "投資信託", "ipo"],
@@ -92,7 +92,7 @@ export const templates: Record<string, ArticleTemplate> = {
 [AFFILIATE:{CTA_THEME}]
 
 ## まとめ
-この記事はAIの下書きをもとに運営者が編集しています。金融商品への投資には元本割れのリスクがあります。`,
+金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: [],
     requiredVisuals: [{ kind: "steps", label: "開設・登録手順" }],
     ctaThemes: ["証券口座", "nisa", "ideco"],
@@ -122,7 +122,7 @@ export const templates: Record<string, ArticleTemplate> = {
 [FAQ]
 
 ## 免責事項
-この記事はAIの下書きをもとに運営者が編集しています。特定銘柄への投資を推奨するものではなく、金融商品への投資には元本割れのリスクがあります。`,
+特定銘柄への投資を推奨するものではなく、金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: ["筆者の見解・注目ポイント"],
     requiredVisuals: [{ kind: "chart", label: "業績推移" }],
     ctaThemes: ["個別株", "証券口座", "スイング"],
@@ -156,7 +156,7 @@ export const templates: Record<string, ArticleTemplate> = {
 [FAQ]
 
 ## まとめ
-この記事はAIの下書きをもとに運営者が編集しています（運営者の実体験に基づいています）。特定銘柄への投資を推奨するものではなく、金融商品への投資には元本割れのリスクがあります。`,
+特定銘柄への投資を推奨するものではなく、金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: ["失敗の骨子", "今ならどうするか"],
     requiredVisuals: [
       { kind: "steps", label: "時系列" },

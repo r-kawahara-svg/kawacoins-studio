@@ -6,7 +6,8 @@ import { db } from "@/db";
 import { articles, judgments, experiences } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { marked } from "marked";
-import { createDraftPost, injectAffiliateRel } from "@/lib/wp";
+import { createDraftPost, injectAffiliateRel, uploadMedia, setFeaturedMedia } from "@/lib/wp";
+import { generateEyecatchPng } from "@/lib/eyecatch";
 import { isJudgmentComplete } from "@/lib/gate";
 import { replaceAffiliatePlaceholders } from "@/lib/affiliate";
 import { getTemplate } from "@/lib/templates";
@@ -73,6 +74,17 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
 
       const wpResult = await createDraftPost({ title: article.title, content: html, status: "draft" });
       await db.update(articles).set({ status: "published", wpPostId: wpResult.id, publishedAt: new Date() }).where(eq(articles.id, articleId));
+
+      // アイキャッチ生成・アップロード（失敗しても記事投稿を継続）
+      try {
+        const png = await generateEyecatchPng(article.title, article.template);
+        const filename = `eyecatch-${article.id.slice(0, 8)}.png`;
+        const mediaId = await uploadMedia(png, filename);
+        await setFeaturedMedia(wpResult.id, mediaId);
+      } catch (e) {
+        console.warn("[eyecatch] skipped:", e instanceof Error ? e.message : e);
+      }
+
       return { wpPostId: wpResult.id, link: wpResult.link, status: "published" };
     }
   }
@@ -99,5 +111,15 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
 
   const wpResult = await createDraftPost({ title: article.title, content: html, status: "draft" });
   await db.update(articles).set({ status: "published", wpPostId: wpResult.id, publishedAt: new Date() }).where(eq(articles.id, articleId));
+
+  try {
+    const png = await generateEyecatchPng(article.title, article.template);
+    const filename = `eyecatch-${article.id.slice(0, 8)}.png`;
+    const mediaId = await uploadMedia(png, filename);
+    await setFeaturedMedia(wpResult.id, mediaId);
+  } catch (e) {
+    console.warn("[eyecatch] skipped:", e instanceof Error ? e.message : e);
+  }
+
   return { wpPostId: wpResult.id, link: wpResult.link, status: "published" };
 }
