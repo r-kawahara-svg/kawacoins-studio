@@ -3,11 +3,12 @@
  * API route と Server Action の両方から呼ぶ
  */
 import { db } from "@/db";
-import { articles, judgments, experiences } from "@/db/schema";
+import { articles, judgments, experiences, topics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { marked } from "marked";
 import { createDraftPost, injectAffiliateRel, uploadMedia, setFeaturedMedia } from "@/lib/wp";
 import { generateEyecatchPng } from "@/lib/eyecatch";
+import { applyJinRFormat } from "@/lib/format";
 import { isJudgmentComplete } from "@/lib/gate";
 import { replaceAffiliatePlaceholders } from "@/lib/affiliate";
 import { getTemplate } from "@/lib/templates";
@@ -29,6 +30,17 @@ export class PublishError extends Error {
 export async function publishArticleById(articleId: string): Promise<PublishResult> {
   const [article] = await db.select().from(articles).where(eq(articles.id, articleId));
   if (!article) throw new PublishError("Article not found", 404);
+
+  // eyecatch用: トピックのキーワード・概要を取得
+  const topicRow = article.topicId
+    ? await db.select({ keyword: topics.keyword, summary: topics.summary })
+        .from(topics).where(eq(topics.id, article.topicId)).limit(1)
+        .then(rows => rows[0])
+    : undefined;
+  const eyecatchOpts = {
+    keyword: topicRow?.keyword ?? undefined,
+    description: topicRow?.summary?.slice(0, 50) ?? undefined,
+  };
 
   const tmpl = getTemplate(article.template);
 
@@ -65,6 +77,9 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
       bodyHtml = bodyHtml.replace(/\[FAQ\]/g, renderFaq(faqData));
       bodyHtml = bodyHtml.replace(/\[FAQ\]/g, "");
 
+      // ⑥ JIN:R装飾変換
+      bodyHtml = applyJinRFormat(bodyHtml);
+
       const html = injectAffiliateRel(bodyHtml);
 
       if (!process.env.WP_BASE_URL) {
@@ -77,7 +92,7 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
 
       // アイキャッチ生成・アップロード（失敗しても記事投稿を継続）
       try {
-        const png = await generateEyecatchPng(article.title, article.template);
+        const png = await generateEyecatchPng(article.title, article.template, eyecatchOpts);
         const filename = `eyecatch-${article.id.slice(0, 8)}.png`;
         const mediaId = await uploadMedia(png, filename);
         await setFeaturedMedia(wpResult.id, mediaId);
@@ -101,7 +116,7 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
     .replace(/\[JUDGMENT:take\]/g, judgment.uniqueTake ?? "");
 
   bodyMd = await replaceAffiliatePlaceholders(bodyMd);
-  const rawHtml = await marked(bodyMd);
+  const rawHtml = applyJinRFormat(await marked(bodyMd));
   const html = injectAffiliateRel(rawHtml);
 
   if (!process.env.WP_BASE_URL) {

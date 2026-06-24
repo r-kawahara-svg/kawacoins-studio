@@ -39,6 +39,11 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { topicId } = body as { topicId: string };
 
+  // 現在の年を動的に取得（年号ハードコード防止）
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const dateStr = `${currentYear}年${now.getMonth() + 1}月${now.getDate()}日`;
+
   if (!topicId) {
     return NextResponse.json({ error: "topicId required" }, { status: 400 });
   }
@@ -73,6 +78,12 @@ export async function POST(request: NextRequest) {
   ${AFFILIATE_VOCAB}
   ※表記はこの通り（小文字/日本語を厳守）。
 
+【現在の日付・年号ルール】
+現在の日付: ${dateStr}
+- タイトルや本文で「○○年版」「最新」「今年」と書く場合は必ず${currentYear}年を使う。
+- ${currentYear - 1}年以前を「最新」「今年」「現在」と書いてはいけない。
+- 過去の出来事・データを「${currentYear - 1}年のデータによると」のように過去形で触れるのは可。
+
 【文体ガイド（必ず守ること）】
 - 一人称の語りで口語寄りに書く（「正直〜でした」「〜なんですよね」「やってみて分かったんですが」など）
 - 読者に語りかけるトーンを保つ（「〜と思いませんか？」「ぜひ一度試してみてください」など）
@@ -80,6 +91,19 @@ export async function POST(request: NextRequest) {
 - T1/T5は一人称の実感ベース、T2/T3は親しみやすく要点明快に
 - デメリット・不満点は正直に書く（「正直、ここは不満でした」）
 - 硬い論文調・マニュアル調にならない
+- 1段落は2〜3文まで。話題が変わったら空行。スマホで読みやすく。
+
+【JIN:R装飾ルール（必ず守ること）】
+以下の記法を使うと、後処理で適切なHTMLに変換される（後処理任せでよい）:
+- 重要キーワード・数値: <mark>テキスト</mark> で囲む（1見出しに1〜2か所まで）
+- 注意・デメリット強調: <strong style="color:#e53e3e">テキスト</strong> で囲む
+- 補足・まとめボックス: [JINBOX:note]内容[/JINBOX]（H2区切りに1つまで）
+- 注意喚起ボックス: [JINBOX:warn]内容[/JINBOX]（デメリット・リスク説明に使う）
+- ポイントボックス: [JINBOX:point]内容[/JINBOX]（要点まとめに使う）
+- 一言コメント・本音: [CALLOUT]内容[/CALLOUT]（体験談と相性良い）
+- 箇条書き: 3つ以上の並列要素は必ずMarkdownリスト（- item）でリスト化
+
+過剰装飾禁止: H2セクション1つあたり装飾は合計3〜4個まで。カラフルにしない。
 
 ${GUARDRAILS}${t5Guardrails}`;
 
