@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser, isBypassEnabled } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -9,14 +10,16 @@ export const metadata: Metadata = {
 
 async function signOut() {
   "use server";
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  if (!isBypassEnabled()) {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+  }
   redirect("/login");
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
+  const bypass = isBypassEnabled();
 
   return (
     <html lang="ja" className="h-full">
@@ -35,9 +38,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <a href="/review" style={{ color: "#aeb8c8", fontSize: 13, padding: "6px 12px", borderRadius: 7 }}>レビュー</a>
             </nav>
             <div style={{ flex: 1 }} />
+
+            {/* 開発バイパス表示 — 本番では bypass=false なので絶対に表示されない */}
+            {bypass && (
+              <span style={{
+                background: "#7c3aed",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                fontFamily: "monospace",
+                padding: "3px 9px",
+                borderRadius: 5,
+                letterSpacing: "0.05em",
+              }}>
+                DEV: 認証バイパス中
+              </span>
+            )}
+
             <form action={signOut}>
               <button type="submit" style={{ color: "#7d889b", fontSize: 12, background: "none", border: "none", cursor: "pointer" }}>
-                ログアウト
+                {bypass ? "バイパス解除" : "ログアウト"}
               </button>
             </form>
           </header>
