@@ -14,10 +14,23 @@ export async function updateJudgment(formData: FormData) {
 
   const completed = !!(tradeView?.trim() && position?.trim() && uniqueTake?.trim());
 
-  await db
-    .update(judgments)
-    .set({ tradeView, position, uniqueTake, completed, updatedAt: new Date() })
-    .where(eq(judgments.articleId, articleId));
+  // judgment レコードが存在しない記事（テンプレート記事など）も UPSERT で対応
+  const existing = await db
+    .select({ id: judgments.id })
+    .from(judgments)
+    .where(eq(judgments.articleId, articleId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(judgments)
+      .set({ tradeView, position, uniqueTake, completed, updatedAt: new Date() })
+      .where(eq(judgments.articleId, articleId));
+  } else {
+    await db
+      .insert(judgments)
+      .values({ articleId, tradeView, position, uniqueTake, completed });
+  }
 
   revalidatePath(`/articles/${articleId}`);
 }

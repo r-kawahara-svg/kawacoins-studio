@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface ExpRow {
   id: string;
@@ -14,6 +15,7 @@ interface Props {
   slots: string[];
   initial: ExpRow[];
   template: string | null;
+  articleStatus?: string;
 }
 
 const CHOICE_OPTIONS: Record<string, string[]> = {
@@ -21,7 +23,7 @@ const CHOICE_OPTIONS: Record<string, string[]> = {
   "筆者の見解・注目ポイント": ["強気", "中立", "様子見"],
 };
 
-export function ExperienceForm({ articleId, slots, initial, template }: Props) {
+export function ExperienceForm({ articleId, slots, initial, template, articleStatus }: Props) {
   const initMap: Record<string, ExpRow> = {};
   for (const r of initial) initMap[r.label] = r;
 
@@ -38,10 +40,11 @@ export function ExperienceForm({ articleId, slots, initial, template }: Props) {
       return m;
     }
   );
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [approved, setApproved] = useState(false);
+  const [approved, setApproved] = useState(articleStatus === "approved");
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
@@ -77,6 +80,7 @@ export function ExperienceForm({ articleId, slots, initial, template }: Props) {
         setError(data.error + (data.missing ? `（未充足: ${data.missing.join(", ")}）` : ""));
       } else {
         setApproved(true);
+        router.refresh();  // RSC再レンダリングで公開ボタンを出現させる
       }
     } catch (e) {
       setError(String(e));

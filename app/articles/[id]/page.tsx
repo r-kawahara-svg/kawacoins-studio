@@ -1,10 +1,13 @@
 import { db } from "@/db";
-import { articles, judgments } from "@/db/schema";
+import { articles, judgments, experiences as experiencesTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { marked } from "marked";
 import { notFound } from "next/navigation";
 import { JudgmentGate } from "./JudgmentGate";
+import { ExperienceForm } from "@/app/review/ExperienceForm";
 import { publishArticle } from "@/app/actions/articles";
+import { isJudgmentComplete } from "@/lib/gate";
+import { getTemplate } from "@/lib/templates";
 
 export default async function ArticlePage({
   params,
@@ -20,19 +23,31 @@ export default async function ArticlePage({
 
   if (!article) notFound();
 
-  const [judgment] = await db
-    .select()
-    .from(judgments)
-    .where(eq(judgments.articleId, id));
+  const tmpl = getTemplate(article.template);
+  const isTemplateArticle = !!tmpl;
 
-  // Render markdown — mark JUDGMENT and AFFILIATE placeholders for highlight
+  // テンプレート記事: experience スロットを取得
+  const expRows = isTemplateArticle
+    ? await db.select().from(experiencesTable).where(eq(experiencesTable.articleId, id))
+    : [];
+  const slots = tmpl?.experienceSlots ?? [];
+  const expFilledCount = expRows.filter((e) => e.completed).length;
+  const isExpReady = slots.length === 0 || expFilledCount >= slots.length;
+
+  // 非テンプレート記事: judgment ゲート
+  const [judgment] = isTemplateArticle
+    ? [undefined]
+    : await db.select().from(judgments).where(eq(judgments.articleId, id));
+
+  // 充足判定: フィールド値を直接参照（completed フラグは副産物なので信用しない）
+  const isGateComplete = !isTemplateArticle && judgment ? isJudgmentComplete(judgment) : false;
+
+  // Render markdown
   const markedBody = article.bodyMd
-    // Highlight [JUDGMENT:*] in gold
     .replace(
       /\[JUDGMENT:(trade|position|take)\]/g,
       '<span class="judgment-placeholder" data-type="$1">[JUDGMENT:$1]</span>'
     )
-    // Highlight [AFFILIATE:*] with teal border
     .replace(
       /\[AFFILIATE:([^\]]+)\]/g,
       '<span class="affiliate-placeholder" data-theme="$1">[AFFILIATE:$1]</span>'
@@ -40,7 +55,9 @@ export default async function ArticlePage({
 
   const bodyHtml = await marked(markedBody);
 
-  const isGateComplete = judgment?.completed === true;
+  const breadcrumb = isTemplateArticle
+    ? `記事エディタ — ${tmpl!.name} (${article.template})`
+    : "記事エディタ — 判断ゲートを完了して公開";
 
   return (
     <div style={{ padding: "26px 30px 60px", maxWidth: 1100 }}>
@@ -55,7 +72,7 @@ export default async function ArticlePage({
           marginBottom: 16,
         }}
       >
-        記事エディタ — 判断ゲートを完了して公開
+        {breadcrumb}
       </div>
 
       <div
@@ -102,7 +119,9 @@ export default async function ArticlePage({
                 background:
                   article.status === "published"
                     ? "#0f766b"
-                    : article.status === "gate"
+                    : article.status === "approved"
+                    ? "#0f766b"
+                    : article.status === "gate" || article.status === "review"
                     ? "#b07d2e"
                     : "#697587",
                 color: "#fff",
@@ -155,19 +174,43 @@ export default async function ArticlePage({
           />
         </div>
 
-        {/* Right: Judgment gate + publish */}
+        {/* Right: gate + publish */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <JudgmentGate
-            articleId={id}
-            initial={{
-              tradeView: judgment?.tradeView ?? null,
-              position: judgment?.position ?? null,
-              uniqueTake: judgment?.uniqueTake ?? null,
-              completed: judgment?.completed ?? null,
-            }}
-          />
+          {isTemplateArticle ? (
+            /* テンプレート記事: ExperienceForm を使う */
+            slots.length > 0 ? (
+              <ExperienceForm
+                articleId={id}
+                slots={slots}
+                initial={expRows.map((e) => ({
+                  id: e.id,
+                  label: e.label,
+                  choice: e.choice,
+                  note: e.note,
+                  completed: e.completed,
+                }))}
+                template={article.template}
+                articleStatus={article.status}
+              />
+            ) : (
+              <div style={{ background: "#f0fdf4", border: "1px solid #0f766b", borderRadius: 10, padding: "14px 16px", fontSize: 13, color: "#065f46" }}>
+                このテンプレートは体験入力スロットなし
+              </div>
+            )
+          ) : (
+            /* 非テンプレート記事: JudgmentGate */
+            <JudgmentGate
+              articleId={id}
+              initial={{
+                tradeView: judgment?.tradeView ?? null,
+                position: judgment?.position ?? null,
+                uniqueTake: judgment?.uniqueTake ?? null,
+                completed: judgment?.completed ?? null,
+              }}
+            />
+          )}
 
-          {/* Publish action */}
+          {/* 公開設定 */}
           <div
             style={{
               background: "#fff",
@@ -187,22 +230,6 @@ export default async function ArticlePage({
               公開設定
             </div>
 
-            {!isGateComplete && (
-              <div
-                style={{
-                  background: "#fef3c7",
-                  border: "1px solid #b07d2e",
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  fontSize: 12,
-                  color: "#92400e",
-                  marginBottom: 12,
-                }}
-              >
-                判断ゲートを全て入力してください（{[judgment?.tradeView, judgment?.position, judgment?.uniqueTake].filter(Boolean).length}/3 完了）
-              </div>
-            )}
-
             {article.status === "published" ? (
               <div
                 style={{
@@ -216,27 +243,89 @@ export default async function ArticlePage({
               >
                 公開済み {article.publishedAt ? `— ${new Date(article.publishedAt).toLocaleDateString("ja-JP")}` : ""}
               </div>
+            ) : isTemplateArticle ? (
+              /* テンプレート記事: 体験入力→承認→公開 */
+              article.status === "approved" ? (
+                <form action={publishArticle}>
+                  <input type="hidden" name="articleId" value={id} />
+                  <button
+                    type="submit"
+                    style={{
+                      background: "#0f766b",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 9,
+                      padding: "9px 20px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      width: "100%",
+                    }}
+                  >
+                    WPに投稿する
+                  </button>
+                </form>
+              ) : (
+                <div>
+                  {!isExpReady && (
+                    <div
+                      style={{
+                        background: "#fef3c7",
+                        border: "1px solid #b07d2e",
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                        fontSize: 12,
+                        color: "#92400e",
+                        marginBottom: 8,
+                      }}
+                    >
+                      体験スロットを入力・保存し、承認してください（{expFilledCount}/{slots.length} 完了）
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: "#697587" }}>
+                    右側フォームで体験入力→承認後に投稿できます
+                  </div>
+                </div>
+              )
             ) : (
-              <form action={publishArticle}>
-                <input type="hidden" name="articleId" value={id} />
-                <button
-                  type="submit"
-                  disabled={!isGateComplete}
-                  style={{
-                    background: isGateComplete ? "#0f766b" : "#dce1e8",
-                    color: isGateComplete ? "#fff" : "#697587",
-                    border: "none",
-                    borderRadius: 9,
-                    padding: "9px 20px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: isGateComplete ? "pointer" : "not-allowed",
-                    width: "100%",
-                  }}
-                >
-                  公開する
-                </button>
-              </form>
+              /* 非テンプレート記事: 判断ゲート→公開 */
+              <>
+                {!isGateComplete && (
+                  <div
+                    style={{
+                      background: "#fef3c7",
+                      border: "1px solid #b07d2e",
+                      borderRadius: 8,
+                      padding: "8px 12px",
+                      fontSize: 12,
+                      color: "#92400e",
+                      marginBottom: 12,
+                    }}
+                  >
+                    判断ゲートを全て入力して保存してください（{[judgment?.tradeView, judgment?.position, judgment?.uniqueTake].filter(Boolean).length}/3 完了）
+                  </div>
+                )}
+                <form action={publishArticle}>
+                  <input type="hidden" name="articleId" value={id} />
+                  <button
+                    type="submit"
+                    disabled={!isGateComplete}
+                    style={{
+                      background: isGateComplete ? "#0f766b" : "#dce1e8",
+                      color: isGateComplete ? "#fff" : "#697587",
+                      border: "none",
+                      borderRadius: 9,
+                      padding: "9px 20px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: isGateComplete ? "pointer" : "not-allowed",
+                      width: "100%",
+                    }}
+                  >
+                    公開する
+                  </button>
+                </form>
+              </>
             )}
           </div>
         </div>
