@@ -10,6 +10,7 @@ export const topics = pgTable("topics", {
   revenueScore: integer("revenue_score").default(3), // 1-5
   competition: text("competition").default("mid"),   // 'low' | 'mid' | 'high'
   status: text("status").notNull().default("new"),   // 'new'|'drafting'|'drafted'|'dismissed'
+  template: text("template"),                        // 'T1'|'T2'|'T3'|'T4'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -20,6 +21,9 @@ export const articles = pgTable("articles", {
   bodyMd: text("body_md").notNull(),          // [JUDGMENT:*] プレースホルダ付きMarkdown
   aiModel: text("ai_model"),
   affiliateSlots: jsonb("affiliate_slots").default("[]"), // [{programId, anchorText, position}]
+  template: text("template"),                            // 'T1'|'T2'|'T3'|'T4'
+  visuals: jsonb("visuals").default("[]"),               // [{id, kind, title, caption, source, ...}]
+  faq: jsonb("faq").default("[]"),                       // [{question, answer}]
   status: text("status").notNull().default("gate"), // 'draft'|'gate'|'scheduled'|'published'
   wpPostId: integer("wp_post_id"),
   scheduledAt: timestamp("scheduled_at"),
