@@ -265,31 +265,31 @@ export function generateEyecatchSvg(
 </svg>`;
 }
 
-// ─── フォントを /tmp にキャッシュして resvg に渡す ──────────────────
-// lib/fonts/paths.ts を import することで webpack がバンドルに
-// woff2 ファイルを確実に含める（__dirname トレース）
-import { FONT_JP_PATH, FONT_LAT_PATH } from "@/lib/fonts/paths";
+// ─── フォントを base64 埋め込みデータから /tmp に展開して resvg に渡す ──
+// font-data.ts は webpack バンドルに確実に含まれる JS モジュール
+// → ファイルシステム依存なし・Vercel でも動作保証
+import { FONT_JP_BASE64, FONT_LAT_BASE64 } from "@/lib/fonts/font-data";
 
 let fontFilesReady: string[] | null = null;
 
 async function getFontFiles(): Promise<string[]> {
   if (fontFilesReady) return fontFilesReady;
-  const { readFileSync, writeFileSync, existsSync } = await import("fs");
+  const { writeFileSync, existsSync } = await import("fs");
 
-  const sources = [
-    { src: FONT_JP_PATH,  tmp: "/tmp/noto-jp-700.woff2" },
-    { src: FONT_LAT_PATH, tmp: "/tmp/noto-lat-700.woff2" },
+  const fonts = [
+    { data: FONT_JP_BASE64,  path: "/tmp/noto-jp-700.woff2" },
+    { data: FONT_LAT_BASE64, path: "/tmp/noto-lat-700.woff2" },
   ];
 
   const result: string[] = [];
-  for (const { src, tmp } of sources) {
-    if (!existsSync(tmp)) {
-      try { writeFileSync(tmp, readFileSync(src)); } catch { continue; }
+  for (const { data, path } of fonts) {
+    if (!existsSync(path)) {
+      writeFileSync(path, Buffer.from(data, "base64"));
     }
-    result.push(tmp);
+    result.push(path);
   }
 
-  if (result.length > 0) fontFilesReady = result;
+  fontFilesReady = result;
   return result;
 }
 
