@@ -213,5 +213,9 @@ export function pickBestCategory(
  * Injects rel="sponsored nofollow" into all <a> tags for affiliate compliance.
  */
 export function injectAffiliateRel(html: string): string {
-  return html.replace(/<a /g, '<a rel="sponsored nofollow" ');
+  // rel が既に付いているリンクは上書きしない（wrapAffiliate で付与済みのCTAボタンを壊さない）
+  return html.replace(/<a ([^>]*?)>/gi, (match, attrs: string) => {
+    if (/\brel=/i.test(attrs)) return match; // 既に rel あり → そのまま
+    return `<a rel="nofollow sponsored" ${attrs}>`;
+  });
 }
