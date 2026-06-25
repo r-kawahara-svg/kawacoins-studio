@@ -136,14 +136,14 @@ export function applyVisuals(html: string, visuals: Visual[]): string {
   // TABLE
   html = html.replace(/\[TABLE:([^\]]+)\]/g, (_, label: string) => {
     const v = visuals.find((x) => x.kind === "table" && x.title.includes(label.trim())) as VisualTable | undefined;
-    if (!v || !v.columns?.length) return `<p style="color:#9ba8b5;font-size:12px">(表は準備中: ${escHtml(label)})</p>`;
+    if (!v || !v.columns?.length) return "";
     return renderTable(v);
   });
 
   // STEPS
   html = html.replace(/\[STEPS:([^\]]+)\]/g, (_, label: string) => {
     const v = visuals.find((x) => x.kind === "steps" && x.title.includes(label.trim())) as VisualSteps | undefined;
-    if (!v || !v.steps?.length) return `<p style="color:#9ba8b5;font-size:12px">(ステップ図は準備中: ${escHtml(label)})</p>`;
+    if (!v || !v.steps?.length) return "";
     return renderSteps(v);
   });
 
