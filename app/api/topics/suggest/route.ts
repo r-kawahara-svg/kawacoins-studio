@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { trackUsage } from "@/lib/track-usage";
 
 const client = new Anthropic();
 
@@ -64,6 +65,8 @@ export async function POST(request: NextRequest) {
 - revenue_scoreは: 口座開設/iDeCo/NISAに繋がる=5, 商品紹介=4, 情報系=2〜3`,
     }],
   });
+
+  void trackUsage({ operation: "suggest", model: "claude-sonnet-4-6", inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens });
 
   const toolUse = message.content.find(b => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {

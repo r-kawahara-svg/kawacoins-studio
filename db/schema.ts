@@ -66,6 +66,17 @@ export const experiences = pgTable("experiences", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// API使用量トラッキング
+export const apiUsage = pgTable("api_usage", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  operation: text("operation").notNull(), // "generate_body"|"generate_visuals"|"generate_faq"|"rewrite_body"|"rewrite_visuals"|"rewrite_faq"|"suggest"
+  model: text("model").notNull(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  articleId: uuid("article_id"),  // nullable, 参照整合性なし（記事削除後も記録を残す）
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Phase 2用スキーマ（UIは作らない）
 export const revenues = pgTable("revenues", {
   id: uuid("id").defaultRandom().primaryKey(),

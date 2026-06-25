@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
 import { articles, topics, experiences } from "@/db/schema";
+import { trackUsage } from "@/lib/track-usage";
 import { eq } from "drizzle-orm";
 import { getTemplate } from "@/lib/templates";
 
@@ -139,6 +140,7 @@ ${direction}
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
   });
+  void trackUsage({ operation: "rewrite_body", model: "claude-sonnet-4-6", inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens, articleId });
 
   const bodyMd = message.content
     .filter((b) => b.type === "text")
@@ -168,6 +170,7 @@ ${bodyMd}
       max_tokens: 1500,
       messages: [{ role: "user", content: visualPrompt }],
     });
+    void trackUsage({ operation: "rewrite_visuals", model: "claude-sonnet-4-6", inputTokens: visualMsg.usage.input_tokens, outputTokens: visualMsg.usage.output_tokens, articleId });
 
     const visualText = visualMsg.content
       .filter((b) => b.type === "text")
@@ -196,6 +199,7 @@ JSON のみ返してください。`;
       max_tokens: 1200,
       messages: [{ role: "user", content: faqPrompt }],
     });
+    void trackUsage({ operation: "rewrite_faq", model: "claude-sonnet-4-6", inputTokens: faqMsg.usage.input_tokens, outputTokens: faqMsg.usage.output_tokens, articleId });
 
     const faqText = faqMsg.content
       .filter((b) => b.type === "text")

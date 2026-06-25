@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { topics, articles, judgments, experiences } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getTemplate } from "@/lib/templates";
+import { trackUsage } from "@/lib/track-usage";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -156,6 +157,7 @@ ${skeleton}
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
   });
+  void trackUsage({ operation: "generate_body", model: "claude-sonnet-4-6", inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens });
 
   const bodyMd = message.content
     .filter((b) => b.type === "text")
@@ -190,6 +192,7 @@ ${bodyMd}
       max_tokens: 1500,
       messages: [{ role: "user", content: visualPrompt }],
     });
+    void trackUsage({ operation: "generate_visuals", model: "claude-sonnet-4-6", inputTokens: visualMsg.usage.input_tokens, outputTokens: visualMsg.usage.output_tokens });
 
     const visualText = visualMsg.content
       .filter((b) => b.type === "text")
@@ -219,6 +222,7 @@ JSON のみ返してください。`;
       max_tokens: 1200,
       messages: [{ role: "user", content: faqPrompt }],
     });
+    void trackUsage({ operation: "generate_faq", model: "claude-sonnet-4-6", inputTokens: faqMsg.usage.input_tokens, outputTokens: faqMsg.usage.output_tokens });
 
     const faqText = faqMsg.content
       .filter((b) => b.type === "text")
