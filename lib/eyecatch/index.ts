@@ -265,6 +265,47 @@ export function generateEyecatchSvg(
 </svg>`;
 }
 
+// ─── フォントを /tmp にキャッシュして resvg に渡す ──────────────────
+let fontFilesReady: string[] | null = null;
+
+async function getFontFiles(): Promise<string[]> {
+  if (fontFilesReady) return fontFilesReady;
+
+  const { readFileSync, writeFileSync, existsSync } = await import("fs");
+  const { join } = await import("path");
+
+  // 候補パス: git管理の lib/fonts/ → node_modules の fontsource
+  const candidates = [
+    join(process.cwd(), "lib", "fonts"),
+    join(process.cwd(), "node_modules", "@fontsource", "noto-sans-jp", "files"),
+  ];
+
+  const NAMES = [
+    "noto-sans-jp-japanese-700-normal.woff2",
+    "noto-sans-jp-latin-700-normal.woff2",
+  ];
+
+  const result: string[] = [];
+  for (const name of NAMES) {
+    const tmp = `/tmp/${name}`;
+    if (existsSync(tmp)) {
+      result.push(tmp);
+      continue;
+    }
+    for (const dir of candidates) {
+      const src = join(dir, name);
+      if (existsSync(src)) {
+        writeFileSync(tmp, readFileSync(src));
+        result.push(tmp);
+        break;
+      }
+    }
+  }
+
+  if (result.length > 0) fontFilesReady = result;
+  return result;
+}
+
 // ─── PNG変換 (resvg-js で日本語フォントを明示指定) ──────────────────
 export async function generateEyecatchPng(
   title: string,
@@ -273,15 +314,13 @@ export async function generateEyecatchPng(
 ): Promise<Buffer> {
   const svg = generateEyecatchSvg(title, template, options);
   const { Resvg } = await import("@resvg/resvg-js");
-  const { join } = await import("path");
-  const fontsDir = join(process.cwd(), "lib", "fonts");
+  const fontFiles = await getFontFiles();
   const resvg = new Resvg(svg, {
     font: {
-      fontFiles: [
-        join(fontsDir, "noto-sans-jp-japanese-700-normal.woff2"),
-        join(fontsDir, "noto-sans-jp-latin-700-normal.woff2"),
-      ],
+      fontFiles,
       loadSystemFonts: false,
+      sansSerifFamily: "Noto Sans JP",
+      defaultFontFamily: "Noto Sans JP",
     },
   });
   return Buffer.from(resvg.render().asPng());
