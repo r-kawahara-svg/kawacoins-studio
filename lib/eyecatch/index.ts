@@ -2,7 +2,65 @@
  * アイキャッチ画像生成 (SVG → PNG)
  * OGP標準サイズ 1200×630px
  * デザイン: テーマカラーグラデーション + 白二重枠 + 吹き出し + キーワードタイル
+ *
+ * フォント方式: テキストは opentype.js で事前にベクターパス(<path>)へ変換し
+ * SVG に焼き込む。レンダラ(sharp)側のフォント解決に一切依存しないため、
+ * 日本語システムフォントの無い Vercel/Linux でも確実に文字が描画される。
  */
+import * as opentype from "opentype.js";
+import { FONT_JP_WOFF_BASE64, FONT_LAT_WOFF_BASE64 } from "@/lib/fonts/font-data";
+
+// ─── フォントを base64(woff1) から一度だけパース ──────────────────
+let fontsCache: { jp: opentype.Font; lat: opentype.Font } | null = null;
+function getFonts() {
+  if (fontsCache) return fontsCache;
+  const toAB = (b64: string) => {
+    const buf = Buffer.from(b64, "base64");
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  };
+  fontsCache = {
+    jp: opentype.parse(toAB(FONT_JP_WOFF_BASE64)),
+    lat: opentype.parse(toAB(FONT_LAT_WOFF_BASE64)),
+  };
+  return fontsCache;
+}
+
+// グリフを大きい固定サイズ(REF)でパス化し transform scale で縮小する。
+// resvg は ~36px 以下の抜き文字(o,a 等)の穴を誤って塗りつぶすバグがあるため、
+// 座標を大きいまま保ってベクター縮小することで小サイズでも崩れさせない。
+const REF = 100;
+
+// テキストをグリフごとにパス化。グリフを持つフォント(日本語→ラテン)を自動選択。
+// xLeft 基準・yBaseline ベースラインで配置し、{ svg, width } を返す。
+function buildTextPath(
+  text: string, xLeft: number, yBaseline: number, fontSize: number,
+  fill: string, opacity?: number
+): { svg: string; width: number } {
+  const { jp, lat } = getFonts();
+  const s = fontSize / REF;
+  let penRef = 0;
+  const ds: string[] = [];
+  for (const ch of [...text]) {
+    const f = jp.charToGlyph(ch).index ? jp : (lat.charToGlyph(ch).index ? lat : jp);
+    const glyph = f.charToGlyph(ch);
+    // ベースライン y=0 で REF サイズのパスを生成
+    ds.push(glyph.getPath(penRef, 0, REF).toPathData(2));
+    penRef += (glyph.advanceWidth ?? f.unitsPerEm) * (REF / f.unitsPerEm);
+  }
+  const op = opacity != null ? ` opacity="${opacity}"` : "";
+  const svg = `<g transform="translate(${xLeft},${yBaseline}) scale(${s.toFixed(4)})"><path d="${ds.join(" ")}" fill="${fill}"${op}/></g>`;
+  return { svg, width: penRef * s };
+}
+
+// 中央揃えテキスト(text-anchor="middle"相当)を <g translate> で配置
+function centeredText(
+  text: string, cx: number, yBaseline: number, fontSize: number,
+  fill: string, opacity?: number
+): string {
+  const { svg, width } = buildTextPath(text, 0, yBaseline, fontSize, fill, opacity);
+  const dx = Math.round(cx - width / 2);
+  return `<g transform="translate(${dx},0)">${svg}</g>`;
+}
 
 type Theme = {
   gradA: string;  // グラデーション上端
@@ -150,11 +208,6 @@ function tileColor(base: string, idx: number, total: number): string {
   return `#${clamp(r).toString(16).padStart(2,"0")}${clamp(g).toString(16).padStart(2,"0")}${clamp(b).toString(16).padStart(2,"0")}`;
 }
 
-// ─── SVG エスケープ ────────────────────────────────────────────────
-function esc(s: string): string {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
 // ─── メイン: SVG生成 ──────────────────────────────────────────────
 export function generateEyecatchSvg(
   title: string,
@@ -174,17 +227,16 @@ export function generateEyecatchSvg(
   const totalH      = titleBlockH + descH + (description ? 24 : 0);
   const titleTop    = 315 - totalH / 2;  // 315 = 630/2
 
-  // ─ タイトルテキスト SVG ────────────────────────────────────────
-  const fontFamily = "'Noto Sans JP',sans-serif";
+  // ─ タイトルテキスト (パス化) ───────────────────────────────────
   const titleSvg = layout.lines.map((line, i) => {
     const y = Math.round(titleTop + i * layout.lineH + layout.fontSize * 0.82);
-    return `<text x="600" y="${y}" font-family="${fontFamily}" font-size="${layout.fontSize}" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="2">${esc(line)}</text>`;
+    return centeredText(line, 600, y, layout.fontSize, "#ffffff");
   }).join("\n  ");
 
-  // ─ 説明テキスト ───────────────────────────────────────────────
+  // ─ 説明テキスト (パス化) ───────────────────────────────────────
   const descY = Math.round(titleTop + titleBlockH + 32 + 24 * 0.82);
   const descSvg = description
-    ? `<text x="600" y="${descY}" font-family="${fontFamily}" font-size="24" fill="${theme.accent}" opacity="0.90" text-anchor="middle" letter-spacing="1">${esc(description.slice(0, 50))}</text>`
+    ? centeredText(description.slice(0, 50), 600, descY, 24, theme.accent, 0.9)
     : "";
 
   // ─ 吹き出し ──────────────────────────────────────────────────
@@ -196,7 +248,7 @@ export function generateEyecatchSvg(
   <!-- 吹き出し -->
   <rect x="${bx}" y="${by}" width="${bWidth}" height="${bh}" rx="${bh/2}" fill="white" opacity="0.94"/>
   <polygon points="${bx+24},${by+bh} ${bx+10},${by+bh+22} ${bx+54},${by+bh}" fill="white" opacity="0.94"/>
-  <text x="${bx + bWidth/2}" y="${by + bh/2 + bFontSz*0.38}" font-family="${fontFamily}" font-size="${bFontSz}" font-weight="800" fill="${theme.bubble}" text-anchor="middle">${esc(bText)}</text>`;
+  ${centeredText(bText, bx + bWidth/2, by + bh/2 + bFontSz*0.38, bFontSz, theme.bubble)}`;
 
   // ─ キーワードタイル ────────────────────────────────────────────
   const TW = 72, TH = 72, TGAP = 10;
@@ -209,7 +261,7 @@ export function generateEyecatchSvg(
     const color = tileColor(theme.tileBase, i, total);
     return `
   <rect x="${tx}" y="${ty}" width="${TW}" height="${TH}" rx="10" fill="${color}" opacity="0.92"/>
-  <text x="${tx + TW/2}" y="${ty + TH/2 + tfs*0.38}" font-family="${fontFamily}" font-size="${tfs}" font-weight="700" fill="white" text-anchor="middle">${esc(seg)}</text>`;
+  ${centeredText(seg, tx + TW/2, ty + TH/2 + tfs*0.38, tfs, "white")}`;
   }).join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
@@ -251,7 +303,7 @@ export function generateEyecatchSvg(
   <!-- タイトル(シャドウ) -->
   ${layout.lines.map((line, i) => {
     const y = Math.round(titleTop + i * layout.lineH + layout.fontSize * 0.82);
-    return `<text x="602" y="${y+2}" font-family="${fontFamily}" font-size="${layout.fontSize}" font-weight="700" fill="black" text-anchor="middle" opacity="0.25" letter-spacing="2">${esc(line)}</text>`;
+    return centeredText(line, 602, y + 2, layout.fontSize, "black", 0.25);
   }).join("\n  ")}
 
   <!-- タイトル本体 -->
@@ -261,28 +313,14 @@ export function generateEyecatchSvg(
   ${descSvg}
 
   <!-- サイトラベル -->
-  <text x="600" y="606" font-family="monospace" font-size="18" fill="white" opacity="0.45" text-anchor="middle" letter-spacing="2">kawacoins.com</text>
+  ${centeredText("kawacoins.com", 600, 606, 18, "white", 0.45)}
 </svg>`;
 }
 
-// ─── フォントを base64 埋め込みデータから Buffer として resvg に渡す ──
-// font-data.ts は webpack バンドルに確実に含まれる JS モジュール。
-// fontBuffers でメモリから直接渡すので、ファイルシステム依存ゼロ
-// (/tmp 書き込みやパス解決が不要 → Vercel でも確実に動く)
-import { FONT_JP_BASE64, FONT_LAT_BASE64 } from "@/lib/fonts/font-data";
-
-let fontBuffersReady: Buffer[] | null = null;
-
-function getFontBuffers(): Buffer[] {
-  if (fontBuffersReady) return fontBuffersReady;
-  fontBuffersReady = [
-    Buffer.from(FONT_JP_BASE64, "base64"),
-    Buffer.from(FONT_LAT_BASE64, "base64"),
-  ];
-  return fontBuffersReady;
-}
-
-// ─── PNG変換 (resvg-js で日本語フォントを明示指定) ──────────────────
+// ─── PNG変換 (resvg) ──────────────────────────────────────────────
+// SVG 内のテキストは opentype.js で <path> に焼き込み済み。よってレンダラ側の
+// フォント解決は一切不要 = Linux でフォントが読めない問題はそもそも発生しない。
+// resvg はパス描画が正確(小さいグリフの抜き文字も崩れない)なのでこちらを使う。
 export async function generateEyecatchPng(
   title: string,
   template: string | null | undefined,
@@ -290,13 +328,5 @@ export async function generateEyecatchPng(
 ): Promise<Buffer> {
   const svg = generateEyecatchSvg(title, template, options);
   const { Resvg } = await import("@resvg/resvg-js");
-  // fontBuffers は実行時はサポートされているが 2.6.2 の型定義に無いため cast
-  const font = {
-    fontBuffers: getFontBuffers(),
-    loadSystemFonts: false,
-    sansSerifFamily: "Noto Sans JP",
-    defaultFontFamily: "Noto Sans JP",
-  } as unknown as ConstructorParameters<typeof Resvg>[1] extends { font?: infer F } ? F : never;
-  const resvg = new Resvg(svg, { font });
-  return Buffer.from(resvg.render().asPng());
+  return Buffer.from(new Resvg(svg).render().asPng());
 }
