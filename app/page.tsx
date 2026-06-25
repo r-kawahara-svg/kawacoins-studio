@@ -76,6 +76,7 @@ export default async function DashboardPage() {
             label: "公開済み",
             value: publishedCount.count,
             unit: "件",
+            href: "/published",
             color: "#0f766b",
           },
         ].map((k) => (
