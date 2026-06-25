@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginForm() {
-  const [email, setEmail] = useState("");
+interface Props {
+  mode: "password" | "magic-link";
+}
+
+export default function LoginForm({ mode }: Props) {
+  const [value, setValue] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,9 +17,25 @@ export default function LoginForm() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    if (mode === "password") {
+      const res = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: value }),
+      });
+      const data = await res.json() as { error?: string };
+      setLoading(false);
+      if (!res.ok) { setError(data.error ?? "エラーが発生しました"); return; }
+      // フルリロードで Cookie を反映させてから / へ
+      window.location.href = "/";
+      return;
+    }
+
+    // Magic Link フロー
     const supabase = createClient();
     const { error: sbError } = await supabase.auth.signInWithOtp({
-      email,
+      email: value,
       options: { emailRedirectTo: `${location.origin}/auth/callback` },
     });
     setLoading(false);
@@ -34,10 +54,31 @@ export default function LoginForm() {
           <div style={{ fontFamily: "monospace", fontSize: 11, color: "#7d889b" }}>kawacoins.com</div>
         </div>
 
-        {sent ? (
+        {mode === "password" ? (
+          <form onSubmit={handleSubmit}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#697587", display: "block", marginBottom: 6 }}>合言葉パスワード</label>
+            <input
+              type="password"
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              required
+              autoFocus
+              placeholder="パスワードを入力"
+              style={{ width: "100%", border: "1px solid #dce1e8", borderRadius: 9, padding: "10px 12px", fontSize: 14, color: "#161d2b", marginBottom: 8, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+            {error && <p style={{ color: "#c4453a", fontSize: 12, marginBottom: 8 }}>{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ width: "100%", background: "#0f766b", color: "#fff", border: "none", borderRadius: 9, padding: "11px", fontSize: 14, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? "確認中..." : "ログイン"}
+            </button>
+          </form>
+        ) : sent ? (
           <div style={{ textAlign: "center", color: "#0f766b", fontSize: 14, lineHeight: 1.7 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>✉️</div>
-            <p>Magic Linkを <strong>{email}</strong> へ送信しました。</p>
+            <p>Magic Linkを <strong>{value}</strong> へ送信しました。</p>
             <p style={{ color: "#697587", fontSize: 12, marginTop: 8 }}>メール内のリンクをクリックしてログインしてください。</p>
           </div>
         ) : (
@@ -45,8 +86,8 @@ export default function LoginForm() {
             <label style={{ fontSize: 12, fontWeight: 600, color: "#697587", display: "block", marginBottom: 6 }}>メールアドレス</label>
             <input
               type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              value={value}
+              onChange={e => setValue(e.target.value)}
               required
               placeholder="your@email.com"
               style={{ width: "100%", border: "1px solid #dce1e8", borderRadius: 9, padding: "10px 12px", fontSize: 14, color: "#161d2b", marginBottom: 8, outline: "none", fontFamily: "inherit" }}

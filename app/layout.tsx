@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, isBypassEnabled } from "@/lib/auth";
+import { getCurrentUser, isBypassEnabled, isSitePasswordMode } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -10,7 +9,14 @@ export const metadata: Metadata = {
 
 async function signOut() {
   "use server";
-  if (!isBypassEnabled()) {
+  if (isSitePasswordMode()) {
+    // SITE_PASSWORD モード: /api/auth/logout で Cookie 削除
+    // server action から fetch は localhost を叩くため、直接 Cookie を削除する
+    const { cookies } = await import("next/headers");
+    const { COOKIE_NAME } = await import("@/lib/site-auth");
+    (await cookies()).delete(COOKIE_NAME);
+  } else if (!isBypassEnabled()) {
+    const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
     await supabase.auth.signOut();
   }
