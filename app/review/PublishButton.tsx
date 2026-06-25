@@ -1,40 +1,56 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { publishArticle } from "@/app/actions/articles";
 
 export function PublishButton({ articleId }: { articleId: string }) {
   const [isPending, startTransition] = useTransition();
+  const [done, setDone] = useState(false);
+  const [pressed, setPressed] = useState(false);
 
   function handleClick() {
+    setDone(false);
     startTransition(async () => {
       const fd = new FormData();
       fd.set("articleId", articleId);
       await publishArticle(fd);
+      setDone(true);
     });
   }
+
+  const bg = done ? "#16a34a" : isPending ? "#0a5249" : "#0f766b";
 
   return (
     <button
       onClick={handleClick}
-      disabled={isPending}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      onMouseLeave={() => setPressed(false)}
+      disabled={isPending || done}
       style={{
-        background: isPending ? "#0a5249" : "#0f766b",
+        background: bg,
         color: "#fff",
         border: "none",
         borderRadius: 8,
         padding: "8px 20px",
         fontSize: 13,
         fontWeight: 600,
-        cursor: isPending ? "not-allowed" : "pointer",
+        cursor: isPending || done ? "not-allowed" : "pointer",
         minHeight: 36,
         display: "flex",
         alignItems: "center",
+        justifyContent: "center",
         gap: 8,
-        transition: "background 0.15s",
+        transform: pressed && !isPending && !done ? "scale(0.96)" : "scale(1)",
+        boxShadow: pressed && !isPending && !done
+          ? "inset 0 2px 5px rgba(0,0,0,0.25)"
+          : "0 1px 3px rgba(15,118,107,0.35)",
+        transition: "background 0.15s, transform 0.08s, box-shadow 0.08s",
       }}
     >
-      {isPending ? (
+      {done ? (
+        <>✓ 投稿完了</>
+      ) : isPending ? (
         <>
           <span style={{
             display: "inline-block",
