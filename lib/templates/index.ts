@@ -176,6 +176,8 @@ export const templates: Record<string, ArticleTemplate> = {
 ## 基本的な仕組み
 制度の概要・特徴・対象者を分かりやすく解説する。数値・条件は正確に記載し、捏造しない。
 
+[TABLE:制度概要]
+
 ## メリットと注意点
 メリットを整理した上で、見落とされがちなデメリット・注意点も正直に書く。
 
@@ -192,7 +194,7 @@ export const templates: Record<string, ArticleTemplate> = {
 ## まとめ
 金融商品への投資には元本割れのリスクがあります。`,
     experienceSlots: [],
-    requiredVisuals: [],
+    requiredVisuals: [{ kind: "table", label: "制度概要" }],
     ctaThemes: ["証券口座", "nisa", "ideco", "投資信託"],
   },
 };

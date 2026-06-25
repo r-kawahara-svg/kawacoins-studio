@@ -5,7 +5,7 @@ import { getTemplate } from "@/lib/templates";
 import { ExperienceForm } from "./ExperienceForm";
 import { RewriteButton } from "./RewriteButton";
 import { RejectButton } from "./RejectButton";
-import { publishArticle } from "@/app/actions/articles";
+import { PublishButton } from "./PublishButton";
 import { DeleteButton } from "@/app/articles/[id]/DeleteButton";
 
 export const dynamic = "force-dynamic";
@@ -114,16 +114,8 @@ export default async function ReviewPage() {
 
               {/* Action bar */}
               <div style={{ display: "flex", gap: 10, marginTop: 16, paddingTop: 14, borderTop: "1px solid #dce1e8", alignItems: "center" }}>
-                {article.status === "approved" ? (
-                  <form action={publishArticle}>
-                    <input type="hidden" name="articleId" value={article.id} />
-                    <button
-                      type="submit"
-                      style={{ background: "#0f766b", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-                    >
-                      WPに投稿する
-                    </button>
-                  </form>
+                {(article.status === "approved" || slots.length === 0) ? (
+                  <PublishButton articleId={article.id} />
                 ) : (
                   <div style={{ fontSize: 12, color: "#697587" }}>
                     体験入力を保存・承認後に投稿できます
