@@ -12,7 +12,7 @@ export default async function AffiliatesPage() {
   const programs = await db.select().from(affiliatePrograms);
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ padding: "20px 16px 60px", maxWidth: 900, margin: "0 auto" }}>
       <div
         style={{
           fontSize: 10.5,
@@ -271,8 +271,8 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   border: "1px solid #dce1e8",
   borderRadius: 9,
-  padding: "8px 12px",
-  fontSize: 13,
+  padding: "10px 12px",
+  fontSize: 16,
   color: "#161d2b",
   background: "#fff",
   fontFamily: "inherit",

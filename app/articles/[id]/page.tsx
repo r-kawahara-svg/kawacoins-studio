@@ -61,7 +61,7 @@ export default async function ArticlePage({
     : "記事エディタ — 判断ゲートを完了して公開";
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 1100 }}>
+    <div style={{ padding: "20px 16px 60px", maxWidth: 1100, margin: "0 auto" }}>
       <div
         style={{
           fontSize: 10.5,
@@ -76,14 +76,7 @@ export default async function ArticlePage({
         {breadcrumb}
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 360px",
-          gap: 24,
-          alignItems: "start",
-        }}
-      >
+      <div className="article-grid" style={{ display: "grid", gap: 24, alignItems: "start" }}>
         {/* Left: Article preview */}
         <div
           style={{

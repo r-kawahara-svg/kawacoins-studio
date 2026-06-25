@@ -32,7 +32,7 @@ export default async function TopicsPage() {
   const rows = await db.select().from(topics).orderBy(desc(topics.createdAt));
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ padding: "20px 16px 60px", maxWidth: 900, margin: "0 auto" }}>
       <div style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "#697587", fontWeight: 600, fontFamily: "monospace", marginBottom: 16 }}>
         ネタキュー — 手動でネタを追加して下書き生成へ
       </div>
@@ -132,7 +132,7 @@ export default async function TopicsPage() {
   );
 }
 
-const inputStyle: React.CSSProperties = { width: "100%", border: "1px solid #dce1e8", borderRadius: 9, padding: "8px 12px", fontSize: 13, color: "#161d2b", background: "#fff", fontFamily: "inherit" };
+const inputStyle: React.CSSProperties = { width: "100%", border: "1px solid #dce1e8", borderRadius: 9, padding: "10px 12px", fontSize: 16, color: "#161d2b", background: "#fff", fontFamily: "inherit" };
 
 function Label({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 12, fontWeight: 600, color: "#697587", marginBottom: 4 }}>{children}</div>;

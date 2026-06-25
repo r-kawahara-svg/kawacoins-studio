@@ -37,7 +37,7 @@ export default async function ReviewPage() {
   }
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 1100, margin: "0 auto" }}>
+    <div style={{ padding: "20px 16px 60px", maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "#697587", fontWeight: 600, fontFamily: "monospace", marginBottom: 16 }}>
         承認レビュー — 体験入力 &amp; 承認
       </div>
@@ -93,7 +93,7 @@ export default async function ReviewPage() {
               </div>
 
               {/* Main layout */}
-              <div style={{ display: "grid", gridTemplateColumns: slots.length > 0 ? "1fr 340px" : "1fr", gap: 20, alignItems: "start" }}>
+              <div className={slots.length > 0 ? "review-grid-2col" : ""} style={{ display: "grid", gap: 20, alignItems: "start" }}>
                 {/* Article preview excerpt */}
                 <div style={{ fontSize: 13, color: "#2b3a52", lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "hidden", position: "relative" }}>
                   {article.bodyMd.slice(0, 500)}{article.bodyMd.length > 500 ? "…" : ""}

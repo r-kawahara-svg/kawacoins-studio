@@ -138,8 +138,8 @@ export function ExperienceForm({ articleId, slots, initial, template, articleSta
               value={row.note}
               onChange={(e) => setRows((prev) => ({ ...prev, [label]: { ...prev[label], note: e.target.value } }))}
               placeholder={label.includes("骨子") ? "銘柄・時期・損失額・行動の事実を記入（AIは改変しません）" : "補足・コメント（任意）"}
-              rows={label.includes("骨子") || label.includes("どうするか") ? 4 : 2}
-              style={{ width: "100%", borderRadius: 7, border: "1px solid #dce1e8", padding: "7px 10px", fontSize: 12, color: "#2b3a52", resize: "vertical", fontFamily: "sans-serif", boxSizing: "border-box" }}
+              rows={label.includes("骨子") || label.includes("どうするか") ? 5 : 3}
+              style={{ width: "100%", borderRadius: 7, border: "1px solid #dce1e8", padding: "10px 12px", fontSize: 16, color: "#2b3a52", resize: "vertical", fontFamily: "sans-serif", boxSizing: "border-box", lineHeight: 1.6 }}
             />
           </div>
         );
@@ -155,7 +155,7 @@ export function ExperienceForm({ articleId, slots, initial, template, articleSta
         <button
           onClick={save}
           disabled={saving}
-          style={{ flex: 1, background: "#1a3a2a", color: "#fff", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
+          style={{ flex: 1, background: "#1a3a2a", color: "#fff", border: "none", borderRadius: 10, padding: "13px 0", fontSize: 15, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, minHeight: 50 }}
         >
           {saving ? "保存中…" : saved ? "保存しました ✓" : "保存"}
         </button>
@@ -164,7 +164,7 @@ export function ExperienceForm({ articleId, slots, initial, template, articleSta
           onClick={approve}
           disabled={approving || !allFilled}
           title={!allFilled ? "全スロットを入力して保存してください" : ""}
-          style={{ flex: 1, background: allFilled ? "#0f766b" : "#dce1e8", color: allFilled ? "#fff" : "#697587", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 600, cursor: allFilled && !approving ? "pointer" : "not-allowed", opacity: approving ? 0.6 : 1 }}
+          style={{ flex: 1, background: allFilled ? "#0f766b" : "#dce1e8", color: allFilled ? "#fff" : "#697587", border: "none", borderRadius: 10, padding: "13px 0", fontSize: 15, fontWeight: 600, cursor: allFilled && !approving ? "pointer" : "not-allowed", opacity: approving ? 0.6 : 1, minHeight: 50 }}
         >
           {approving ? "処理中…" : "承認"}
         </button>

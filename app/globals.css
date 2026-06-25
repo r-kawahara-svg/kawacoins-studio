@@ -16,7 +16,9 @@
   --color-amber: #d98a1f;
 }
 
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   background: #e9ecf0;
@@ -24,27 +26,131 @@ body {
   font-family: "Inter", "Noto Sans JP", sans-serif;
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
+  /* 横スクロール撲滅 */
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
-/* Sidebar responsive */
+/* ─── アプリシェル ─────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  min-height: 100dvh;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  /* ボトムナビの高さ分だけ下パディング（モバイル） */
+  padding-bottom: 0;
+}
+
+/* ─── デスクトップ サイドバー ────────────────────────────── */
 .sidebar-desktop { display: flex !important; }
 .sidebar-mobile-bar { display: none !important; }
+.bottom-tab-bar { display: none !important; }
 
+/* ─── モバイル レスポンシブ ─────────────────────────────── */
 @media (max-width: 767px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
   .sidebar-desktop { display: none !important; }
+
   .sidebar-mobile-bar {
     display: flex !important;
-    align-items: center;
-    background: #161d2b;
     position: sticky;
     top: 0;
     z-index: 30;
-    min-height: 48px;
+  }
+
+  /* ボトムタブバー */
+  .bottom-tab-bar {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: #161d2b;
+    border-top: 1px solid #232f42;
+    /* iOS セーフエリア対応 */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ボトムナビ分の余白 */
+  .app-main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
 
-/* Loading pulse animation */
+/* ─── タップ対象 最小44px ───────────────────────────────── */
+button, a, [role="button"] {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+/* ただしテキストリンクは除外 */
+a:not([class]) {
+  min-height: unset;
+}
+
+/* ─── iOS 自動ズーム防止（16px 以上） ──────────────────── */
+input, textarea, select {
+  font-size: max(16px, 1rem) !important;
+}
+
+/* ─── 横スクロール隔離 ──────────────────────────────────── */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── テーブル / コード横スクロール ─────────────────────── */
+table {
+  min-width: max-content;
+}
+
+/* ─── Loading pulse ─────────────────────────────────────── */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
+}
+
+/* ─── レスポンシブ グリッド ──────────────────────────────── */
+
+/* 記事詳細: デスクトップ2列 → モバイル1列 */
+.article-grid {
+  grid-template-columns: 1fr 360px;
+}
+@media (max-width: 767px) {
+  .article-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* レビュー: 2列 → モバイル1列 */
+.review-grid-2col {
+  grid-template-columns: 1fr 340px;
+}
+@media (max-width: 767px) {
+  .review-grid-2col {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* フォームグリッド: 2列 → モバイル1列 */
+@media (max-width: 600px) {
+  [style*="gridTemplateColumns: \"1fr 1fr\""],
+  [style*='gridTemplateColumns: "1fr 1fr"'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── セーフエリア ───────────────────────────────────────── */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .sidebar-mobile-bar {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }

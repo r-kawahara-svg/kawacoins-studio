@@ -1,10 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getCurrentUser, isBypassEnabled } from "@/lib/auth";
 import { Sidebar } from "@/app/components/Sidebar";
 
 export const metadata: Metadata = {
   title: "記事スタジオ — kawacoins.com",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "記事スタジオ",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#161d2b",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,11 +33,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="ja" className="h-full">
-      <body style={{ minHeight: "100vh", background: "#e9ecf0", color: "#161d2b", fontFamily: "'Inter', 'Noto Sans JP', sans-serif" }}>
+      <head>
+        {/* SW登録 */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+              navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+          }
+        ` }} />
+      </head>
+      <body style={{ minHeight: "100dvh", background: "#e9ecf0", color: "#161d2b", fontFamily: "'Inter', 'Noto Sans JP', sans-serif", overflowX: "hidden" }}>
         {user ? (
-          <div style={{ display: "flex", minHeight: "100vh" }}>
+          <div className="app-shell">
             <Sidebar bypass={bypass} />
-            <main style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
+            <main className="app-main">
               {children}
             </main>
           </div>

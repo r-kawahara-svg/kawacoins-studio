@@ -26,12 +26,13 @@ const inputStyle: React.CSSProperties = {
   flex: 1,
   border: "1px solid #dce1e8",
   borderRadius: 9,
-  padding: "9px 14px",
-  fontSize: 14,
+  padding: "11px 14px",
+  fontSize: 16,
   color: "#161d2b",
   background: "#fff",
   fontFamily: "inherit",
   outline: "none",
+  minHeight: 48,
 };
 
 export function SuggestPanel() {
