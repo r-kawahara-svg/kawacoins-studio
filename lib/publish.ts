@@ -235,7 +235,7 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
 
   // ⑦ カテゴリ・タグ解決
   const { wpCategories, wpTags } = await resolveWpTaxonomy(
-    article.title, topicRow?.keyword
+    article.title, topicRow?.keyword, article.template
   );
 
   const wpResult = await createDraftPost({
