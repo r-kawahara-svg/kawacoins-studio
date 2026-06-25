@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { topics, articles } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import Link from "next/link";
+import { DeleteButton } from "@/app/articles/[id]/DeleteButton";
 
 export default async function DashboardPage() {
   // Real DB counts
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
 
   // Gate articles list (status = 'gate', most recent 10)
   const gateArticles = await db
-    .select({ id: articles.id, title: articles.title, createdAt: articles.createdAt })
+    .select({ id: articles.id, title: articles.title, createdAt: articles.createdAt, wpPostId: articles.wpPostId })
     .from(articles)
     .where(eq(articles.status, "gate"))
     .limit(10);
@@ -312,6 +313,7 @@ export default async function DashboardPage() {
               >
                 判断入力 →
               </Link>
+              <DeleteButton articleId={a.id} hasWpPost={!!a.wpPostId} compact />
             </div>
           ))}
         </div>

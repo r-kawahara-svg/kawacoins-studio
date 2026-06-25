@@ -5,6 +5,7 @@ import { getTemplate } from "@/lib/templates";
 import { ExperienceForm } from "./ExperienceForm";
 import { RejectButton } from "./RejectButton";
 import { publishArticle } from "@/app/actions/articles";
+import { DeleteButton } from "@/app/articles/[id]/DeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -127,7 +128,8 @@ export default async function ReviewPage() {
                     体験入力を保存・承認後に投稿できます
                   </div>
                 )}
-                <div style={{ marginLeft: "auto" }}>
+                <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                  <DeleteButton articleId={article.id} hasWpPost={!!article.wpPostId} compact />
                   <RejectButton articleId={article.id} />
                 </div>
               </div>

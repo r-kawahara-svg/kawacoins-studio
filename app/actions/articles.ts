@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { judgments } from "@/db/schema";
+import { articles, judgments, experiences } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { publishArticleById, PublishError } from "@/lib/publish";
 
 export async function updateJudgment(formData: FormData) {
@@ -48,4 +49,29 @@ export async function publishArticle(formData: FormData) {
   revalidatePath(`/articles/${articleId}`);
   revalidatePath("/review");
   revalidatePath("/");
+}
+
+/**
+ * 記事をDBから削除する。
+ * WP投稿済み(wpPostId あり)の場合もDBレコードだけ削除し、WP側は触らない。
+ */
+export async function deleteArticle(formData: FormData) {
+  const articleId = formData.get("articleId") as string;
+  if (!articleId) return;
+
+  // 存在確認
+  const [article] = await db
+    .select({ id: articles.id, wpPostId: articles.wpPostId })
+    .from(articles)
+    .where(eq(articles.id, articleId));
+  if (!article) return;
+
+  // 関連レコードを先に削除（FK制約対応）
+  await db.delete(experiences).where(eq(experiences.articleId, articleId));
+  await db.delete(judgments).where(eq(judgments.articleId, articleId));
+  await db.delete(articles).where(eq(articles.id, articleId));
+
+  revalidatePath("/");
+  revalidatePath("/review");
+  redirect("/review");
 }

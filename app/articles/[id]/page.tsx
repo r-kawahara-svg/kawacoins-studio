@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { JudgmentGate } from "./JudgmentGate";
 import { ExperienceForm } from "@/app/review/ExperienceForm";
 import { publishArticle } from "@/app/actions/articles";
+import { DeleteButton } from "./DeleteButton";
 import { isJudgmentComplete } from "@/lib/gate";
 import { getTemplate } from "@/lib/templates";
 
@@ -135,6 +136,7 @@ export default async function ArticlePage({
             >
               {article.status}
             </span>
+            <DeleteButton articleId={id} hasWpPost={!!article.wpPostId} compact />
           </div>
 
           <style>{`
