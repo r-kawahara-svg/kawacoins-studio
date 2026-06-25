@@ -59,12 +59,18 @@ export async function buildAffiliateMap(): Promise<Map<string, AffiliateRow>> {
  */
 export function wrapAffiliate(html: string): string {
   // rel="sponsored nofollow" を保証（既存の rel= があれば上書き、なければ付与）
-  let out = html.replace(/<a ([^>]*?)>/g, (_, attrs: string) => {
-    // rel 属性を除去してから付与
-    const noRel = attrs.replace(/\s*rel="[^"]*"/, "");
-    return `<a rel="sponsored nofollow" ${noRel}>`;
+  // テキストリンク(<a>)はボタンスタイルに変換
+  let out = html.replace(/<a ([^>]*?)>([\s\S]*?)<\/a>/gi, (_, attrs: string, inner: string) => {
+    const noRel = attrs.replace(/\s*rel="[^"]*"/, "").trim();
+    // バナー画像を含む場合はそのまま（ボタン化しない）
+    if (/<img/i.test(inner)) {
+      return `<a rel="sponsored nofollow" ${noRel}>${inner}</a>`;
+    }
+    // テキストリンク → ボタン化
+    const label = inner.trim() || "公式サイトで詳細を確認する";
+    return `<a rel="sponsored nofollow" ${noRel} style="display:inline-block;padding:12px 28px;background:#e85d26;color:#fff;font-weight:700;font-size:15px;border-radius:6px;text-decoration:none;letter-spacing:0.5px">${label}</a>`;
   });
-  return `<div style="max-width:100%;overflow-x:auto;text-align:center">\n${out}\n</div>`;
+  return `<div style="max-width:100%;overflow-x:auto;text-align:center;margin:24px 0;padding:4px 0">\n${out}\n</div>`;
 }
 
 /**

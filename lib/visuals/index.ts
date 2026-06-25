@@ -147,10 +147,12 @@ export function applyVisuals(html: string, visuals: Visual[]): string {
     return renderSteps(v);
   });
 
-  // CHART
+  // CHART — データなし・数値なしの場合はプレースホルダごと除去（壊れた状態で残さない）
   html = html.replace(/\[CHART:([^\]]+)\]/g, (_, label: string) => {
     const v = visuals.find((x) => x.kind === "chart" && x.title.includes(label.trim())) as VisualChart | undefined;
-    if (!v || !v.series?.length) return `<p style="color:#9ba8b5;font-size:12px">(グラフは準備中: ${escHtml(label)})</p>`;
+    if (!v || !v.series?.length) return "";
+    const hasNumbers = v.series.some(s => s.values?.some(n => !isNaN(n) && n !== 0));
+    if (!hasNumbers) return "";
     return renderChart(v);
   });
 

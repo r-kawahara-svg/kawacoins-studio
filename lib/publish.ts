@@ -6,7 +6,10 @@ import { db } from "@/db";
 import { articles, judgments, experiences, topics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { marked } from "marked";
-import { createDraftPost, injectAffiliateRel, uploadMedia, setFeaturedMedia } from "@/lib/wp";
+import {
+  createDraftPost, injectAffiliateRel, uploadMedia, setFeaturedMedia,
+  getWpCategories, getWpTags, findOrCreateTag, pickBestCategory,
+} from "@/lib/wp";
 import { generateEyecatchPng } from "@/lib/eyecatch";
 import { applyJinRFormat } from "@/lib/format";
 import { isJudgmentComplete } from "@/lib/gate";
@@ -19,6 +22,68 @@ export interface PublishResult {
   link?: string;
   skipped?: string;
   status: string;
+}
+
+// ─── WPカテゴリ・タグ解決 ─────────────────────────────────────────
+async function resolveWpTaxonomy(
+  title: string,
+  keyword: string | null | undefined
+): Promise<{ wpCategories: number[]; wpTags: number[] }> {
+  try {
+    const [cats, existingTags] = await Promise.all([getWpCategories(), getWpTags()]);
+    const catId = pickBestCategory(cats, title, keyword);
+    const wpCategories = catId ? [catId] : [];
+
+    // タグ: キーワードを分割して既存タグを探し、なければ作成（最大3個）
+    const tagCandidates = [
+      ...(keyword?.split(/[\s　・、。\/]+/).filter(w => w.length >= 2) ?? []),
+    ].slice(0, 3);
+
+    const wpTags: number[] = [];
+    for (const candidate of tagCandidates) {
+      // 既存タグから完全一致 or 部分一致を探す
+      const existing = existingTags.find(
+        t => t.name === candidate || t.name.includes(candidate) || candidate.includes(t.name)
+      );
+      if (existing) {
+        wpTags.push(existing.id);
+      } else {
+        const newId = await findOrCreateTag(candidate);
+        if (newId) wpTags.push(newId);
+      }
+      if (wpTags.length >= 3) break;
+    }
+
+    return { wpCategories, wpTags };
+  } catch (e) {
+    console.warn("[taxonomy] skipped:", e instanceof Error ? e.message : e);
+    return { wpCategories: [], wpTags: [] };
+  }
+}
+
+// 選択肢ラベルを文中で自然に読める語句へ変換
+const CHOICE_NATURAL: Record<string, string> = {
+  "強気": "個人的には強気で見ており、",
+  "中立": "見通しとしては中立で、",
+  "様子見": "現時点では様子見の姿勢で、",
+  "満足": "実際に使ってみて満足しています。",
+  "ふつう": "使ってみると普通といった印象で、",
+  "不満": "正直なところ少し不満もあり、",
+  "買い": "個人的には買い目線で、",
+  "売り": "個人的には売り目線で、",
+  "ホールド": "現在はホールドで保有しており、",
+  "あり": "",
+  "なし": "",
+};
+
+function experienceToText(choice: string | null, note: string | null, label: string): string {
+  const choicePhrase = choice ? (CHOICE_NATURAL[choice] ?? `${choice}。`) : "";
+  if (note && note.trim()) {
+    // note が主体。choice を前置きとして自然につなぐ
+    return choicePhrase ? `${choicePhrase}${note.trim()}` : note.trim();
+  }
+  if (choicePhrase) return choicePhrase.replace(/[、。]$/, "");
+  return `（${label}）`;
 }
 
 export class PublishError extends Error {
@@ -55,12 +120,12 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
         throw new PublishError(`体験スロットが未充足です: ${missing.join(", ")}`, 422);
       }
 
-      // ② [EXPERIENCE:*] 置換
+      // ② [EXPERIENCE:*] 置換（選択肢ラベルが生で露出しないよう自然語に変換）
       let bodyMd = article.bodyMd;
       for (const exp of exps) {
-        const replacement = [exp.choice, exp.note].filter(Boolean).join(" — ");
+        const replacement = experienceToText(exp.choice, exp.note, exp.label);
         const re = new RegExp(`\\[EXPERIENCE:${exp.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "g");
-        bodyMd = bodyMd.replace(re, replacement || `（${exp.label}）`);
+        bodyMd = bodyMd.replace(re, replacement);
       }
       bodyMd = bodyMd.replace(/\[EXPERIENCE:[^\]]+\]/g, "");
 
@@ -87,7 +152,15 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
         return { skipped: "WP_BASE_URL not set", status: "published" };
       }
 
-      const wpResult = await createDraftPost({ title: article.title, content: html, status: "draft" });
+      // ⑦ カテゴリ・タグ解決
+      const { wpCategories, wpTags } = await resolveWpTaxonomy(
+        article.title, topicRow?.keyword
+      );
+
+      const wpResult = await createDraftPost({
+        title: article.title, content: html, status: "draft",
+        categories: wpCategories, tags: wpTags,
+      });
       await db.update(articles).set({ status: "published", wpPostId: wpResult.id, publishedAt: new Date() }).where(eq(articles.id, articleId));
 
       // アイキャッチ生成・アップロード（失敗しても記事投稿を継続）
@@ -124,7 +197,15 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
     return { skipped: "WP_BASE_URL not set", status: "published" };
   }
 
-  const wpResult = await createDraftPost({ title: article.title, content: html, status: "draft" });
+  // ⑦ カテゴリ・タグ解決
+  const { wpCategories, wpTags } = await resolveWpTaxonomy(
+    article.title, topicRow?.keyword
+  );
+
+  const wpResult = await createDraftPost({
+    title: article.title, content: html, status: "draft",
+    categories: wpCategories, tags: wpTags,
+  });
   await db.update(articles).set({ status: "published", wpPostId: wpResult.id, publishedAt: new Date() }).where(eq(articles.id, articleId));
 
   try {
