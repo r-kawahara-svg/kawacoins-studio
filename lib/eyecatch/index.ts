@@ -15,6 +15,11 @@ type Theme = {
 };
 
 const THEMES: Record<string, Theme> = {
+  T6: {
+    gradA: "#2b5c8c", gradB: "#1e4570", gradC: "#102b4f",
+    accent: "#90c8f0", tileBase: "#2d71b8", bubble: "#102b4f",
+    tag: "制度をわかりやすく",
+  },
   T1: {
     gradA: "#1c8070", gradB: "#0f6b5a", gradC: "#083f35",
     accent: "#7ee8d4", tileBase: "#1a9a82", bubble: "#083f35",
@@ -170,7 +175,7 @@ export function generateEyecatchSvg(
   const titleTop    = 315 - totalH / 2;  // 315 = 630/2
 
   // ─ タイトルテキスト SVG ────────────────────────────────────────
-  const fontFamily = "'Yu Gothic','Hiragino Sans','Noto Sans CJK JP','Meiryo',sans-serif";
+  const fontFamily = "'Noto Sans JP',sans-serif";
   const titleSvg = layout.lines.map((line, i) => {
     const y = Math.round(titleTop + i * layout.lineH + layout.fontSize * 0.82);
     return `<text x="600" y="${y}" font-family="${fontFamily}" font-size="${layout.fontSize}" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="2">${esc(line)}</text>`;
@@ -260,13 +265,24 @@ export function generateEyecatchSvg(
 </svg>`;
 }
 
-// ─── PNG変換 ──────────────────────────────────────────────────────
+// ─── PNG変換 (resvg-js で日本語フォントを明示指定) ──────────────────
 export async function generateEyecatchPng(
   title: string,
   template: string | null | undefined,
   options: { keyword?: string; subtitle?: string; description?: string } = {}
 ): Promise<Buffer> {
   const svg = generateEyecatchSvg(title, template, options);
-  const sharp = (await import("sharp")).default;
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  const { Resvg } = await import("@resvg/resvg-js");
+  const { join } = await import("path");
+  const fontsDir = join(process.cwd(), "lib", "fonts");
+  const resvg = new Resvg(svg, {
+    font: {
+      fontFiles: [
+        join(fontsDir, "noto-sans-jp-japanese-700-normal.woff2"),
+        join(fontsDir, "noto-sans-jp-latin-700-normal.woff2"),
+      ],
+      loadSystemFonts: false,
+    },
+  });
+  return Buffer.from(resvg.render().asPng());
 }

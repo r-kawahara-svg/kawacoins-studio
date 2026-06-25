@@ -110,9 +110,11 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
   const tmpl = getTemplate(article.template);
 
   if (tmpl) {
-    // ① 体験スロット充足チェック
-    if (tmpl.experienceSlots.length > 0) {
-      const exps = await db.select().from(experiences).where(eq(experiences.articleId, articleId));
+    // ① 体験スロット充足チェック（スロットなし=T3/T6も template フローを通る）
+    if (true) {
+      const exps = tmpl.experienceSlots.length > 0
+        ? await db.select().from(experiences).where(eq(experiences.articleId, articleId))
+        : [];
       const missing = tmpl.experienceSlots.filter(
         (slot) => !exps.find((e) => e.label === slot && e.completed)
       );

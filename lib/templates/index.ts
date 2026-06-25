@@ -6,7 +6,7 @@
  * ctaThemes: [AFFILIATE:xxx] に使う統制語彙
  */
 export interface ArticleTemplate {
-  id: "T1" | "T2" | "T3" | "T4" | "T5";
+  id: "T1" | "T2" | "T3" | "T4" | "T5" | "T6";
   name: string;
   skeleton: string;
   experienceSlots: string[];
@@ -163,6 +163,35 @@ export const templates: Record<string, ArticleTemplate> = {
       { kind: "table", label: "敗因分解" },
     ],
     ctaThemes: ["証券口座", "スイング", "個別株"],
+  },
+
+  T6: {
+    id: "T6",
+    name: "制度解説型",
+    skeleton: `# {TITLE}
+
+## はじめに
+なぜこの制度・仕組みを知っておくべきか、背景と目的を説明する。
+
+## 基本的な仕組み
+制度の概要・特徴・対象者を分かりやすく解説する。数値・条件は正確に記載し、捏造しない。
+
+## メリットと注意点
+メリットを整理した上で、見落とされがちなデメリット・注意点も必ず記載する。
+
+## よくある疑問
+[FAQ]
+
+## 活用のポイント
+実際にどう活かすか、具体的な活用シーンを示す。
+
+[AFFILIATE:{CTA_THEME}]
+
+## まとめ
+金融商品への投資には元本割れのリスクがあります。`,
+    experienceSlots: [],
+    requiredVisuals: [],
+    ctaThemes: ["証券口座", "nisa", "ideco", "投資信託"],
   },
 };
 

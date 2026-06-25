@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // sharp はデフォルトで Next.js 16 がバンドルするため serverExternalPackages 不要
-  // Vercel の Node.js 20 ランタイムで動作確認済み
+  // ネイティブバイナリを持つパッケージはバンドル対象外にする
+  serverExternalPackages: ["@resvg/resvg-js"],
+  // lib/fonts/* (Noto Sans JP WOFF2) をサーバーレス関数バンドルに含める
+  outputFileTracingIncludes: {
+    "**": ["./lib/fonts/**"],
+  },
 };
 
 export default nextConfig;
