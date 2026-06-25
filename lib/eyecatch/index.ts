@@ -265,32 +265,21 @@ export function generateEyecatchSvg(
 </svg>`;
 }
 
-// ─── フォントを base64 埋め込みデータから /tmp に展開して resvg に渡す ──
-// font-data.ts は webpack バンドルに確実に含まれる JS モジュール
-// → ファイルシステム依存なし・Vercel でも動作保証
+// ─── フォントを base64 埋め込みデータから Buffer として resvg に渡す ──
+// font-data.ts は webpack バンドルに確実に含まれる JS モジュール。
+// fontBuffers でメモリから直接渡すので、ファイルシステム依存ゼロ
+// (/tmp 書き込みやパス解決が不要 → Vercel でも確実に動く)
 import { FONT_JP_BASE64, FONT_LAT_BASE64 } from "@/lib/fonts/font-data";
 
-let fontFilesReady: string[] | null = null;
+let fontBuffersReady: Buffer[] | null = null;
 
-async function getFontFiles(): Promise<string[]> {
-  if (fontFilesReady) return fontFilesReady;
-  const { writeFileSync, existsSync } = await import("fs");
-
-  const fonts = [
-    { data: FONT_JP_BASE64,  path: "/tmp/noto-jp-700.woff2" },
-    { data: FONT_LAT_BASE64, path: "/tmp/noto-lat-700.woff2" },
+function getFontBuffers(): Buffer[] {
+  if (fontBuffersReady) return fontBuffersReady;
+  fontBuffersReady = [
+    Buffer.from(FONT_JP_BASE64, "base64"),
+    Buffer.from(FONT_LAT_BASE64, "base64"),
   ];
-
-  const result: string[] = [];
-  for (const { data, path } of fonts) {
-    if (!existsSync(path)) {
-      writeFileSync(path, Buffer.from(data, "base64"));
-    }
-    result.push(path);
-  }
-
-  fontFilesReady = result;
-  return result;
+  return fontBuffersReady;
 }
 
 // ─── PNG変換 (resvg-js で日本語フォントを明示指定) ──────────────────
@@ -301,14 +290,13 @@ export async function generateEyecatchPng(
 ): Promise<Buffer> {
   const svg = generateEyecatchSvg(title, template, options);
   const { Resvg } = await import("@resvg/resvg-js");
-  const fontFiles = await getFontFiles();
-  const resvg = new Resvg(svg, {
-    font: {
-      fontFiles,
-      loadSystemFonts: false,
-      sansSerifFamily: "Noto Sans JP",
-      defaultFontFamily: "Noto Sans JP",
-    },
-  });
+  // fontBuffers は実行時はサポートされているが 2.6.2 の型定義に無いため cast
+  const font = {
+    fontBuffers: getFontBuffers(),
+    loadSystemFonts: false,
+    sansSerifFamily: "Noto Sans JP",
+    defaultFontFamily: "Noto Sans JP",
+  } as unknown as ConstructorParameters<typeof Resvg>[1] extends { font?: infer F } ? F : never;
+  const resvg = new Resvg(svg, { font });
   return Buffer.from(resvg.render().asPng());
 }

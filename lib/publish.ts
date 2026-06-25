@@ -250,7 +250,7 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
     const mediaId = await uploadMedia(png, filename);
     await setFeaturedMedia(wpResult.id, mediaId);
   } catch (e) {
-    console.warn("[eyecatch] skipped:", e instanceof Error ? e.message : e);
+    console.error("[eyecatch] 生成・アップロード失敗:", e instanceof Error ? e.stack ?? e.message : e);
   }
 
   return { wpPostId: wpResult.id, link: wpResult.link, status: "published" };
