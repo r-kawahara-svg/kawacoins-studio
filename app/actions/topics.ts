@@ -3,6 +3,21 @@
 import { db } from "@/db";
 import { topics } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import type { TopicSuggestion } from "@/app/api/topics/suggest/route";
+
+export async function adoptSuggestedTopic(suggestion: TopicSuggestion) {
+  await db.insert(topics).values({
+    title: suggestion.title,
+    source: suggestion.source,
+    keyword: suggestion.keyword,
+    summary: suggestion.summary,
+    revenueScore: suggestion.revenue_score,
+    template: suggestion.template,
+    competition: "mid",
+    status: "new",
+  });
+  revalidatePath("/topics");
+}
 
 export async function addTopic(formData: FormData) {
   const title = (formData.get("title") as string).trim();

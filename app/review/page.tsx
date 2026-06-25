@@ -36,7 +36,7 @@ export default async function ReviewPage() {
   }
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 1100 }}>
+    <div style={{ padding: "26px 30px 60px", maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "#697587", fontWeight: 600, fontFamily: "monospace", marginBottom: 16 }}>
         承認レビュー — 体験入力 &amp; 承認
       </div>

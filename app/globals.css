@@ -25,3 +25,26 @@ body {
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
 }
+
+/* Sidebar responsive */
+.sidebar-desktop { display: flex !important; }
+.sidebar-mobile-bar { display: none !important; }
+
+@media (max-width: 767px) {
+  .sidebar-desktop { display: none !important; }
+  .sidebar-mobile-bar {
+    display: flex !important;
+    align-items: center;
+    background: #161d2b;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    min-height: 48px;
+  }
+}
+
+/* Loading pulse animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}

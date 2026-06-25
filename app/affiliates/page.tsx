@@ -12,7 +12,7 @@ export default async function AffiliatesPage() {
   const programs = await db.select().from(affiliatePrograms);
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 900 }}>
+    <div style={{ padding: "26px 30px 60px", maxWidth: 900, margin: "0 auto" }}>
       <div
         style={{
           fontSize: 10.5,

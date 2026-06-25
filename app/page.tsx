@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     .where(eq(articles.status, "scheduled"));
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 1000 }}>
+    <div style={{ padding: "26px 30px 60px", maxWidth: 1000, margin: "0 auto" }}>
       <div
         style={{
           fontSize: 10.5,

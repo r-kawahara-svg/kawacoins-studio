@@ -3,6 +3,7 @@ import { topics } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { addTopic } from "@/app/actions/topics";
 import { GenerateButton } from "./GenerateButton";
+import { SuggestPanel } from "./SuggestPanel";
 
 const SOURCE_LABELS: Record<string, { label: string; bg: string }> = {
   earnings: { label: "決算", bg: "#2b5e8c" },
@@ -31,10 +32,13 @@ export default async function TopicsPage() {
   const rows = await db.select().from(topics).orderBy(desc(topics.createdAt));
 
   return (
-    <div style={{ padding: "26px 30px 60px", maxWidth: 900 }}>
+    <div style={{ padding: "26px 30px 60px", maxWidth: 900, margin: "0 auto" }}>
       <div style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "#697587", fontWeight: 600, fontFamily: "monospace", marginBottom: 16 }}>
         ネタキュー — 手動でネタを追加して下書き生成へ
       </div>
+
+      {/* AI ネタ提案 */}
+      <SuggestPanel />
 
       {/* 追加フォーム */}
       <div style={{ background: "#fff", border: "1px solid #dce1e8", borderRadius: 14, marginBottom: 20, padding: "20px 24px", boxShadow: "0 1px 2px rgba(22,29,43,.04)" }}>
