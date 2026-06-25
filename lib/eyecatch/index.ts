@@ -266,40 +266,27 @@ export function generateEyecatchSvg(
 }
 
 // ─── フォントを /tmp にキャッシュして resvg に渡す ──────────────────
+// lib/fonts/paths.ts を import することで webpack がバンドルに
+// woff2 ファイルを確実に含める（__dirname トレース）
+import { FONT_JP_PATH, FONT_LAT_PATH } from "@/lib/fonts/paths";
+
 let fontFilesReady: string[] | null = null;
 
 async function getFontFiles(): Promise<string[]> {
   if (fontFilesReady) return fontFilesReady;
-
   const { readFileSync, writeFileSync, existsSync } = await import("fs");
-  const { join } = await import("path");
 
-  // 候補パス: git管理の lib/fonts/ → node_modules の fontsource
-  const candidates = [
-    join(process.cwd(), "lib", "fonts"),
-    join(process.cwd(), "node_modules", "@fontsource", "noto-sans-jp", "files"),
-  ];
-
-  const NAMES = [
-    "noto-sans-jp-japanese-700-normal.woff2",
-    "noto-sans-jp-latin-700-normal.woff2",
+  const sources = [
+    { src: FONT_JP_PATH,  tmp: "/tmp/noto-jp-700.woff2" },
+    { src: FONT_LAT_PATH, tmp: "/tmp/noto-lat-700.woff2" },
   ];
 
   const result: string[] = [];
-  for (const name of NAMES) {
-    const tmp = `/tmp/${name}`;
-    if (existsSync(tmp)) {
-      result.push(tmp);
-      continue;
+  for (const { src, tmp } of sources) {
+    if (!existsSync(tmp)) {
+      try { writeFileSync(tmp, readFileSync(src)); } catch { continue; }
     }
-    for (const dir of candidates) {
-      const src = join(dir, name);
-      if (existsSync(src)) {
-        writeFileSync(tmp, readFileSync(src));
-        result.push(tmp);
-        break;
-      }
-    }
+    result.push(tmp);
   }
 
   if (result.length > 0) fontFilesReady = result;

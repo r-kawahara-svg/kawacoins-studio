@@ -1,15 +1,20 @@
 import { db } from "@/db";
 import { apiUsage } from "@/db/schema";
 
-// claude-sonnet-4-6 料金 (2026年6月時点)
+// 料金表 $/1M tokens (2026年6月時点)
 const PRICING: Record<string, { input: number; output: number }> = {
-  "claude-sonnet-4-6": { input: 3.0, output: 15.0 },   // $/1M tokens
-  "claude-opus-4-8":   { input: 5.0, output: 25.0 },
-  "claude-haiku-4-5":  { input: 1.0, output: 5.0 },
+  "claude-haiku-4-5":          { input: 1.0,  output: 5.0  },
+  "claude-haiku-4-5-20251001": { input: 1.0,  output: 5.0  },
+  "claude-sonnet-4-6":         { input: 3.0,  output: 15.0 },
+  "claude-sonnet-4-5":         { input: 3.0,  output: 15.0 },
+  "claude-opus-4-6":           { input: 5.0,  output: 25.0 },
+  "claude-opus-4-8":           { input: 5.0,  output: 25.0 },
 };
 
 export function calcCostUsd(model: string, inputTokens: number, outputTokens: number): number {
-  const p = PRICING[model] ?? PRICING["claude-sonnet-4-6"];
+  // 日付サフィックス付きモデルID → 正規化
+  const normalized = model.replace(/-\d{8}$/, "");
+  const p = PRICING[model] ?? PRICING[normalized] ?? PRICING["claude-sonnet-4-6"];
   return (inputTokens * p.input + outputTokens * p.output) / 1_000_000;
 }
 

@@ -24,14 +24,48 @@ export interface PublishResult {
   status: string;
 }
 
+// テンプレート → デフォルトカテゴリ名
+const TEMPLATE_CATEGORY: Record<string, string> = {
+  T1: "投資体験談",
+  T2: "証券口座比較",
+  T3: "投資の始め方",
+  T4: "決算分析",
+  T5: "投資の失敗談",
+  T6: "制度・税制解説",
+};
+
 // ─── WPカテゴリ・タグ解決 ─────────────────────────────────────────
 async function resolveWpTaxonomy(
   title: string,
-  keyword: string | null | undefined
+  keyword: string | null | undefined,
+  template: string | null | undefined,
 ): Promise<{ wpCategories: number[]; wpTags: number[] }> {
   try {
     const [cats, existingTags] = await Promise.all([getWpCategories(), getWpTags()]);
-    const catId = pickBestCategory(cats, title, keyword);
+    let catId = pickBestCategory(cats, title, keyword);
+
+    // マッチしない場合はテンプレートベースのカテゴリを findOrCreate
+    if (!catId && template && TEMPLATE_CATEGORY[template]) {
+      const catName = TEMPLATE_CATEGORY[template];
+      const existing = cats.find(c => c.name === catName);
+      if (existing) {
+        catId = existing.id;
+      } else {
+        // WP REST API でカテゴリ新規作成
+        const base = process.env.WP_BASE_URL?.replace(/\/$/, "");
+        const auth = "Basic " + Buffer.from(`${process.env.WP_USERNAME}:${process.env.WP_APP_PASSWORD}`).toString("base64");
+        const res = await fetch(`${base}/?rest_route=/wp/v2/categories`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: auth },
+          body: JSON.stringify({ name: catName }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { id: number };
+          catId = data.id;
+        }
+      }
+    }
+
     const wpCategories = catId ? [catId] : [];
 
     // タグ: キーワードを分割して既存タグを探し、なければ作成（最大3個）
@@ -156,7 +190,7 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
 
       // ⑦ カテゴリ・タグ解決
       const { wpCategories, wpTags } = await resolveWpTaxonomy(
-        article.title, topicRow?.keyword
+        article.title, topicRow?.keyword, article.template
       );
 
       const wpResult = await createDraftPost({

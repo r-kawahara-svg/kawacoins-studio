@@ -15,6 +15,15 @@ const OP_LABELS: Record<string, string> = {
   suggest:          "ネタ提案",
 };
 
+const MODEL_LABELS: Record<string, { name: string; color: string }> = {
+  "claude-haiku-4-5-20251001": { name: "Haiku 4.5", color: "#2b5c8c" },
+  "claude-haiku-4-5":          { name: "Haiku 4.5", color: "#2b5c8c" },
+  "claude-sonnet-4-6":         { name: "Sonnet 4.6", color: "#1a3a2a" },
+  "claude-sonnet-4-5":         { name: "Sonnet 4.5", color: "#2d6a3f" },
+  "claude-opus-4-8":           { name: "Opus 4.8",   color: "#5c2b8c" },
+  "claude-opus-4-6":           { name: "Opus 4.6",   color: "#4a2277" },
+};
+
 const OP_COLORS: Record<string, string> = {
   generate_body:    "#1a3a2a",
   generate_visuals: "#2b5c3a",
@@ -199,23 +208,29 @@ export default async function CostsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
               <thead>
                 <tr style={{ background: "#f8faf9" }}>
-                  {["日時", "操作", "入力tokens", "出力tokens", "コスト"].map(h => (
+                  {["日時", "操作", "モデル", "入力tokens", "出力tokens", "コスト"].map(h => (
                     <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontWeight: 600, color: "#697587", borderBottom: "1px solid #dce1e8", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {recent.map((r, i) => {
-                  const cost = calcCostUsd("claude-sonnet-4-6", r.inputTokens ?? 0, r.outputTokens ?? 0);
-                  const color = OP_COLORS[r.operation] ?? "#697587";
+                  const modelInfo = MODEL_LABELS[r.model] ?? { name: r.model.replace("claude-", "").replace(/-\d{8}$/, ""), color: "#697587" };
+                  const cost = calcCostUsd(r.model, r.inputTokens ?? 0, r.outputTokens ?? 0);
+                  const opColor = OP_COLORS[r.operation] ?? "#697587";
                   return (
                     <tr key={r.id} style={{ borderBottom: "1px solid #f0f4f8", background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
                       <td style={{ padding: "7px 14px", color: "#9ba8b5", fontFamily: "monospace", whiteSpace: "nowrap" }}>
                         {r.createdAt ? new Date(r.createdAt).toLocaleString("ja-JP", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
                       </td>
                       <td style={{ padding: "7px 14px" }}>
-                        <span style={{ background: color, color: "#fff", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600, fontFamily: "monospace", whiteSpace: "nowrap" }}>
-                          {r.operation}
+                        <span style={{ background: opColor, color: "#fff", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600, fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                          {OP_LABELS[r.operation] ?? r.operation}
+                        </span>
+                      </td>
+                      <td style={{ padding: "7px 14px" }}>
+                        <span style={{ background: modelInfo.color, color: "#fff", borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 700, fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                          {modelInfo.name}
                         </span>
                       </td>
                       <td style={{ padding: "7px 14px", fontFamily: "monospace", color: "#2b3a52" }}>{fmtTokens(r.inputTokens ?? 0)}</td>
