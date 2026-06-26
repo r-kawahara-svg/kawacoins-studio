@@ -11,6 +11,7 @@ export async function addAffiliate(formData: FormData) {
   const themesRaw = formData.get("themes") as string;
   const htmlSnippet = formData.get("html_snippet") as string;
   const payoutRaw = formData.get("payout") as string;
+  const strength = (formData.get("strength") as string)?.trim() || null;
 
   // themes is a comma-separated string → parse to JSON array
   const themes = themesRaw
@@ -25,8 +26,22 @@ export async function addAffiliate(formData: FormData) {
     themes,
     htmlSnippet,
     payout,
+    strength,
     active: true,
   });
+
+  revalidatePath("/affiliates");
+}
+
+// 既存プログラムの強み(USP)を更新する
+export async function updateStrength(formData: FormData) {
+  const id = formData.get("id") as string;
+  const strength = (formData.get("strength") as string)?.trim() || null;
+
+  await db
+    .update(affiliatePrograms)
+    .set({ strength })
+    .where(eq(affiliatePrograms.id, id));
 
   revalidatePath("/affiliates");
 }

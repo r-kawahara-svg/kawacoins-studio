@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { affiliatePrograms } from "@/db/schema";
-import { addAffiliate, toggleAffiliate } from "@/app/actions/affiliates";
+import { addAffiliate, toggleAffiliate, updateStrength } from "@/app/actions/affiliates";
 
 const ASP_LABELS: Record<string, string> = {
   a8: "A8.net",
@@ -78,6 +78,13 @@ export default async function AffiliatesPage() {
               <Input
                 name="themes"
                 placeholder="例: NISA, 個別株, iDeCo"
+              />
+            </div>
+            <div style={{ gridColumn: "1/-1" }}>
+              <Label>強み・USP（CTAボタン上に表示）</Label>
+              <Input
+                name="strength"
+                placeholder="例: 運営管理手数料がずっと無料"
               />
             </div>
             <div style={{ gridColumn: "1/-1" }}>
@@ -230,10 +237,50 @@ export default async function AffiliatesPage() {
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                     maxWidth: 500,
+                    marginBottom: 8,
                   }}
                 >
                   {p.htmlSnippet}
                 </code>
+
+                {/* 強み(USP)インライン編集 — CTAボタン上に表示される */}
+                <form
+                  action={updateStrength}
+                  style={{ display: "flex", gap: 6, alignItems: "center", maxWidth: 500 }}
+                >
+                  <input type="hidden" name="id" value={p.id} />
+                  <span style={{ fontSize: 11, color: "#15803d", fontWeight: 700 }}>✓ 強み</span>
+                  <input
+                    name="strength"
+                    defaultValue={p.strength ?? ""}
+                    placeholder="例: 運営管理手数料がずっと無料"
+                    style={{
+                      flex: 1,
+                      border: "1px solid #dce1e8",
+                      borderRadius: 7,
+                      padding: "5px 9px",
+                      fontSize: 12.5,
+                      color: "#161d2b",
+                      background: "#fff",
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      background: "#f0fdf4",
+                      color: "#065f46",
+                      border: "1px solid #0f766b",
+                      borderRadius: 7,
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    保存
+                  </button>
+                </form>
               </div>
 
               <form action={toggleAffiliate} style={{ flexShrink: 0 }}>

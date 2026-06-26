@@ -14,6 +14,7 @@ interface AffiliateRow {
   themes: string[];
   adType: string | null;
   priority: number | null;
+  strength: string | null;
 }
 
 /**
@@ -29,6 +30,7 @@ export async function buildAffiliateMap(): Promise<Map<string, AffiliateRow>> {
       themes: affiliatePrograms.themes,
       adType: affiliatePrograms.adType,
       priority: affiliatePrograms.priority,
+      strength: affiliatePrograms.strength,
     })
     .from(affiliatePrograms)
     .where(eq(affiliatePrograms.active, true))
@@ -126,7 +128,7 @@ function parseSnippet(html: string): SnippetParts {
  * - rel="nofollow sponsored" は必ず保持
  * - A8計測ピクセル (1×1 img) は絶対に壊さない
  */
-export function wrapAffiliate(html: string, rowName = "", anchorText = ""): string {
+export function wrapAffiliate(html: string, rowName = "", anchorText = "", strength: string | null = null): string {
   const { href, hasBannerImg, trackingPixels } = parseSnippet(html);
 
   // ── バナー（画像）の場合 ──────────────────────────────────────
@@ -157,9 +159,14 @@ export function wrapAffiliate(html: string, rowName = "", anchorText = ""): stri
     "-webkit-tap-highlight-color:transparent",
   ].join(";");
 
+  // サービス固有の強み(USP)があればボタン上にベネフィット行を表示
+  const strengthHtml = strength?.trim()
+    ? `<p style="font-size:13px;color:#15803d;font-weight:700;margin:0 0 10px;line-height:1.5">✓ ${strength.trim()}</p>`
+    : "";
+
   return `<div style="max-width:480px;margin:36px auto;text-align:center;padding:0 16px;box-sizing:border-box">
 <p style="font-size:12px;color:#888;margin:0 0 10px;letter-spacing:0.5px">${copy.micro}</p>
-<a href="${href}" rel="nofollow sponsored" style="${btnStyle}">${copy.label}</a>
+${strengthHtml}<a href="${href}" rel="nofollow sponsored" style="${btnStyle}">${copy.label}</a>
 ${copy.disclaimer ? `<p style="font-size:11px;color:#bbb;margin:10px 0 0">${copy.disclaimer}</p>` : ""}
 ${trackingPixels}
 </div>`;
@@ -178,7 +185,7 @@ export async function replaceAffiliatePlaceholders(bodyMd: string): Promise<stri
     // アンカーテキストをスニペットから抽出してコピー選択に使う
     const anchorMatch = row.htmlSnippet.match(/<a [^>]*>([^<]+)<\/a>/i);
     const anchorText = anchorMatch?.[1]?.trim() ?? "";
-    return wrapAffiliate(row.htmlSnippet, row.name, anchorText);
+    return wrapAffiliate(row.htmlSnippet, row.name, anchorText, row.strength);
   });
 }
 

@@ -35,6 +35,18 @@ function talkBubble(speaker: "reader" | "author", inner: string): string {
 }
 
 export function applyJinRFormat(html: string): string {
+  // ── [INSIGHT] 筆者独自の考察（コンサル/投資視点）ボックス ──────
+  html = html.replace(
+    /\[INSIGHT\]([\s\S]*?)\[\/INSIGHT\]/gi,
+    (_, content: string) => {
+      const inner = content.trim().replace(/^<p>/i, "").replace(/<\/p>\s*$/i, "").trim();
+      return `<div style="border:1px solid #c7b9e8;background:#f6f2fc;border-radius:12px;padding:14px 18px;margin:22px 0">
+  <div style="font-size:12px;font-weight:700;color:#6d28d9;margin-bottom:6px;letter-spacing:0.4px">💡 コンサル視点の考察</div>
+  <div style="font-size:15px;line-height:1.75;color:#2d2a3a">${inner}</div>
+</div>`;
+    }
+  );
+
   // ── [TALK:reader] / [TALK:author] 会話吹き出し ────────────────
   html = html.replace(
     /\[TALK:(reader|author)\]([\s\S]*?)\[\/TALK\]/gi,
@@ -75,6 +87,10 @@ export function applyJinRFormat(html: string): string {
     /<mark>([\s\S]*?)<\/mark>/gi,
     `<mark style="background:#fff176;padding:1px 4px;border-radius:2px;font-style:normal">$1</mark>`
   );
+
+  // ── 取りこぼしタグの除去（閉じ忘れ等の保険）──────────────────
+  html = html.replace(/\[\/?INSIGHT\]/gi, "");
+  html = html.replace(/\[\/?TALK(?::[a-z]+)?\]/gi, "");
 
   // ── 空の <p></p> 除去 ─────────────────────────────────────────
   html = html.replace(/<p>\s*<\/p>\n?/g, "");
