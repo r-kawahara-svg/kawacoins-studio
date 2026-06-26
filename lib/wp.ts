@@ -124,6 +124,27 @@ export async function setFeaturedMedia(postId: number, mediaId: number): Promise
 interface WpTerm { id: number; name: string; slug: string; count: number; }
 
 /**
+ * 既存WP投稿のカテゴリ・タグを更新する。
+ */
+export async function updatePostTaxonomy(
+  postId: number, categories: number[], tags: number[]
+): Promise<void> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+  const res = await fetch(`${base}/?rest_route=/wp/v2/posts/${postId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: auth },
+    body: JSON.stringify({
+      ...(categories.length ? { categories } : {}),
+      ...(tags.length ? { tags } : {}),
+    }),
+  });
+  if (!res.ok) {
+    console.warn(`[taxonomy] update post ${postId} failed ${res.status}: ${await res.text()}`);
+  }
+}
+
+/**
  * WPの既存カテゴリー一覧を取得する（最大100件）。
  */
 export async function getWpCategories(): Promise<WpTerm[]> {
@@ -147,6 +168,39 @@ export async function getWpTags(): Promise<WpTerm[]> {
   });
   if (!res.ok) return [];
   return res.json() as Promise<WpTerm[]>;
+}
+
+/**
+ * カテゴリ名で既存カテゴリを検索し、なければ作成してIDを返す。
+ * findOrCreateTag と同じく共通の認証ヘルパーを使う。
+ */
+export async function findOrCreateCategory(name: string): Promise<number | null> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+
+  // まず既存カテゴリを検索（名前一致）
+  const searchRes = await fetch(
+    `${base}/?rest_route=/wp/v2/categories&search=${encodeURIComponent(name)}&per_page=10`,
+    { headers: { Authorization: auth } }
+  );
+  if (searchRes.ok) {
+    const found = (await searchRes.json()) as WpTerm[];
+    const exact = found.find(c => c.name === name);
+    if (exact) return exact.id;
+  }
+
+  // 無ければ作成
+  const createRes = await fetch(`${base}/?rest_route=/wp/v2/categories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: auth },
+    body: JSON.stringify({ name }),
+  });
+  if (!createRes.ok) {
+    console.warn(`[category] create failed ${createRes.status}: ${await createRes.text()}`);
+    return null;
+  }
+  const created = (await createRes.json()) as WpTerm;
+  return created.id ?? null;
 }
 
 /**

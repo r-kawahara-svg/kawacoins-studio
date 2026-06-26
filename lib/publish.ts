@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { marked } from "marked";
 import {
   createDraftPost, injectAffiliateRel, uploadMedia, setFeaturedMedia,
-  getWpCategories, getWpTags, findOrCreateTag, pickBestCategory,
+  getWpCategories, getWpTags, findOrCreateTag, findOrCreateCategory, pickBestCategory,
 } from "@/lib/wp";
 import { generateEyecatchPng } from "@/lib/eyecatch";
 import { applyJinRFormat } from "@/lib/format";
@@ -35,38 +35,23 @@ const TEMPLATE_CATEGORY: Record<string, string> = {
 };
 
 // ─── WPカテゴリ・タグ解決 ─────────────────────────────────────────
-async function resolveWpTaxonomy(
+export async function resolveWpTaxonomy(
   title: string,
   keyword: string | null | undefined,
   template: string | null | undefined,
 ): Promise<{ wpCategories: number[]; wpTags: number[] }> {
   try {
     const [cats, existingTags] = await Promise.all([getWpCategories(), getWpTags()]);
+    // ① 既存カテゴリからタイトル/キーワードで最良マッチを探す
     let catId = pickBestCategory(cats, title, keyword);
 
-    // マッチしない場合はテンプレートベースのカテゴリを findOrCreate
+    // ② マッチしなければテンプレ種別のカテゴリを findOrCreate（必ず付与）
     if (!catId && template && TEMPLATE_CATEGORY[template]) {
-      const catName = TEMPLATE_CATEGORY[template];
-      const existing = cats.find(c => c.name === catName);
-      if (existing) {
-        catId = existing.id;
-      } else {
-        // WP REST API でカテゴリ新規作成
-        const base = process.env.WP_BASE_URL?.replace(/\/$/, "");
-        const auth = "Basic " + Buffer.from(`${process.env.WP_USERNAME}:${process.env.WP_APP_PASSWORD}`).toString("base64");
-        const res = await fetch(`${base}/?rest_route=/wp/v2/categories`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: auth },
-          body: JSON.stringify({ name: catName }),
-        });
-        if (res.ok) {
-          const data = await res.json() as { id: number };
-          catId = data.id;
-        }
-      }
+      catId = await findOrCreateCategory(TEMPLATE_CATEGORY[template]);
     }
 
     const wpCategories = catId ? [catId] : [];
+    console.log(`[taxonomy] template=${template} catId=${catId ?? "none"} title="${title.slice(0, 30)}"`);
 
     // タグ: キーワードを分割して既存タグを探し、なければ作成（最大3個）
     const tagCandidates = [

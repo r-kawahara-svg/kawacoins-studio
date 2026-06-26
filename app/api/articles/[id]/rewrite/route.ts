@@ -103,6 +103,7 @@ export async function POST(
 - 補足ボックス: [JINBOX:note]内容[/JINBOX]
 - 注意喚起: [JINBOX:warn]内容[/JINBOX]
 - ポイント: [JINBOX:point]内容[/JINBOX]
+- 会話吹き出し: [TALK:reader]素朴な疑問[/TALK] → [TALK:author]回答[/TALK] のペア（記事全体で2〜3ペアまで、必ずreader→authorの順）
 - 箇条書き: 3つ以上は必ずMarkdownリスト
 
 ${GUARDRAILS}`;

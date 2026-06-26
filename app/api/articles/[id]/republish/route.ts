@@ -3,8 +3,8 @@ import { db } from "@/db";
 import { articles, topics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { generateEyecatchPng } from "@/lib/eyecatch";
-import { uploadMedia, setFeaturedMedia } from "@/lib/wp";
-import { publishArticleById } from "@/lib/publish";
+import { uploadMedia, setFeaturedMedia, updatePostTaxonomy } from "@/lib/wp";
+import { publishArticleById, resolveWpTaxonomy } from "@/lib/publish";
 
 export async function POST(
   _req: NextRequest,
@@ -30,7 +30,14 @@ export async function POST(
     const filename = `eyecatch-${article.id.slice(0, 8)}-${Date.now()}.png`;
     const mediaId = await uploadMedia(png, filename);
     await setFeaturedMedia(article.wpPostId, mediaId);
-    return NextResponse.json({ ok: true, action: "eyecatch_updated", mediaId });
+
+    // カテゴリ・タグも再解決して既存投稿に付与（未設定だった記事の修復用）
+    const { wpCategories, wpTags } = await resolveWpTaxonomy(
+      article.title, topicRow?.keyword, article.template
+    );
+    await updatePostTaxonomy(article.wpPostId, wpCategories, wpTags);
+
+    return NextResponse.json({ ok: true, action: "eyecatch_and_taxonomy_updated", mediaId, wpCategories, wpTags });
   }
 
   // WP未連携の場合: フル再投稿

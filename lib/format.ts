@@ -7,10 +7,40 @@
  *   [JINBOX:warn]内容[/JINBOX]   → 赤枠の注意ボックス
  *   [JINBOX:point]内容[/JINBOX]  → 青枠のポイントボックス
  *   [CALLOUT]内容[/CALLOUT]      → 黄色吹き出しコールアウト
+ *   [TALK:reader]内容[/TALK]     → 読者アイコンの左吹き出し（素朴な疑問など）
+ *   [TALK:author]内容[/TALK]     → 筆者アイコンの右吹き出し（回答・本音など）
  *   <mark>text</mark>            → そのまま（JIN:Rがスタイル付与。ない場合は inline style で補完）
  */
 
+// 会話吹き出し1つ分のHTMLを生成（JIN:Rのアバター設定に依存しない自己完結HTML）
+function talkBubble(speaker: "reader" | "author", inner: string): string {
+  // marked が付けた <p> ラップを除去してインライン化
+  const content = inner.trim().replace(/^<p>/i, "").replace(/<\/p>\s*$/i, "").trim();
+
+  const isReader = speaker === "reader";
+  const emoji   = isReader ? "🤔" : "😊";
+  const name    = isReader ? "読者" : "カワコイン";
+  const avatarBg = isReader ? "#eef2f7" : "#e6f6f2";
+  const border   = isReader ? "#cbd5e0" : "#9fd9cc";
+  const bubbleBg = isReader ? "#f7fafc" : "#effaf6";
+  const dir      = isReader ? "row" : "row-reverse";
+
+  return `<div style="display:flex;flex-direction:${dir};align-items:flex-start;gap:10px;margin:18px 0">
+  <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;width:52px">
+    <div style="width:48px;height:48px;border-radius:50%;background:${avatarBg};border:2px solid ${border};display:flex;align-items:center;justify-content:center;font-size:24px">${emoji}</div>
+    <span style="font-size:10px;color:#718096">${name}</span>
+  </div>
+  <div style="max-width:78%;background:${bubbleBg};border:1px solid ${border};border-radius:12px;padding:11px 15px;font-size:15px;line-height:1.7">${content}</div>
+</div>`;
+}
+
 export function applyJinRFormat(html: string): string {
+  // ── [TALK:reader] / [TALK:author] 会話吹き出し ────────────────
+  html = html.replace(
+    /\[TALK:(reader|author)\]([\s\S]*?)\[\/TALK\]/gi,
+    (_, speaker: string, content: string) => talkBubble(speaker.toLowerCase() as "reader" | "author", content)
+  );
+
   // ── [JINBOX:note] ─────────────────────────────────────────────
   html = html.replace(
     /\[JINBOX:note\]([\s\S]*?)\[\/JINBOX\]/gi,
