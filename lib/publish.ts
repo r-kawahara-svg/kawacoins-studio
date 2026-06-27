@@ -138,7 +138,6 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
     : undefined;
   const eyecatchOpts = {
     keyword: topicRow?.keyword ?? undefined,
-    description: topicRow?.summary?.slice(0, 50) ?? undefined,
   };
 
   const tmpl = getTemplate(article.template);

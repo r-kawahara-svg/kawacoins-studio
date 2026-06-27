@@ -24,7 +24,6 @@ export async function POST(
   if (article.wpPostId) {
     const eyecatchOpts = {
       keyword: topicRow?.keyword ?? undefined,
-      description: topicRow?.summary?.slice(0, 50) ?? undefined,
     };
     const png = await generateEyecatchPng(article.title, article.template, eyecatchOpts);
     const filename = `eyecatch-${article.id.slice(0, 8)}-${Date.now()}.png`;

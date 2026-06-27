@@ -27,7 +27,7 @@ const tests = [
 
 async function main() {
   for (const t of tests) {
-    const png = await generateEyecatchPng(t.title, t.tmpl, { keyword: t.kw, description: t.desc });
+    const png = await generateEyecatchPng(t.title, t.tmpl, { keyword: t.kw });
     const safe = (t.tmpl ?? "default") + (t.title.length > 30 ? "-long" : "");
     const path = `${DESKTOP}\\eyecatch-${safe}.png`;
     writeFileSync(path, png);
