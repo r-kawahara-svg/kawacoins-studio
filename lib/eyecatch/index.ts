@@ -159,12 +159,13 @@ function esc(s: string): string {
 export function generateEyecatchSvg(
   title: string,
   template: string | null | undefined,
-  options: { keyword?: string; subtitle?: string; description?: string } = {}
+  options: { keyword?: string; subtitle?: string; description?: string; illustration?: string } = {}
 ): string {
   const theme: Theme = (template ? THEMES[template] : undefined) ?? DEFAULT_THEME;
-  const subtitle    = options.subtitle    ?? theme.tag;
-  const description = options.description ?? "";
-  const kwTiles     = splitKeyword(options.keyword ?? "");
+  const subtitle      = options.subtitle    ?? theme.tag;
+  const description   = options.description ?? "";
+  const illustration  = options.illustration ?? "";
+  const kwTiles       = splitKeyword(options.keyword ?? "");
   const layout      = layoutTitle(title);
 
   // ─ タイトル縦位置の計算 ────────────────────────────────────────
@@ -236,6 +237,9 @@ export function generateEyecatchSvg(
   <rect width="1200" height="630" fill="url(#dots)"/>
   <ellipse cx="420" cy="280" rx="520" ry="280" fill="url(#glow)"/>
 
+  <!-- AIイラスト -->
+  ${illustration}
+
   <!-- 装飾: 大円 -->
   <circle cx="1080" cy="80"  r="220" fill="white" opacity="0.04"/>
   <circle cx="130"  cy="560" r="170" fill="white" opacity="0.04"/>
@@ -263,6 +267,73 @@ export function generateEyecatchSvg(
   <!-- サイトラベル -->
   <text x="600" y="606" font-family="monospace" font-size="18" fill="white" opacity="0.45" text-anchor="middle" letter-spacing="2">kawacoins.com</text>
 </svg>`;
+}
+
+// ─── Claude API でイラスト <g> を生成 ────────────────────────────────
+const TEMPLATE_LABELS: Record<string, string> = {
+  T1: "実体験レポート・体験談",
+  T2: "徹底比較・ランキング",
+  T3: "完全攻略ガイド・やり方",
+  T4: "決算・株価・市場分析",
+  T5: "失敗談・注意点・リスク",
+  T6: "制度・仕組み・基礎知識",
+};
+
+async function generateIllustrationGroup(
+  title: string,
+  template: string | null | undefined,
+  theme: Theme
+): Promise<string> {
+  if (!process.env.ANTHROPIC_API_KEY) return "";
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const category = template ? (TEMPLATE_LABELS[template] ?? template) : "投資・お金";
+
+    const prompt = `あなたはSVGイラストレーターです。
+ブログ記事のアイキャッチ画像（1200×630px）の右側エリアに配置する、装飾用SVGイラストを生成してください。
+
+記事タイトル: "${title}"
+カテゴリ: ${category}
+配置エリア: x=680〜1150, y=100〜530
+メインカラー: ${theme.accent}
+サブカラー: white
+
+ルール:
+- <g>〜</g> タグのみ返す。説明文・コードブロック記号は一切不要
+- タイトルに関連するアイコン・シルエット（コイン/グラフ/建物/人物/矢印など）を幾何学的に表現
+- fill は ${theme.accent} または white のみ使用し、opacity="0.15"〜"0.55" で透明感を出す
+- テキスト要素（<text>）は含めない
+- SVG要素は8〜20個程度（circle/rect/path/polygon/line/ellipse）
+- シンプルで洗練されたデザイン。背景に溶け込む装飾として機能させる
+
+<g>タグのみ返してください:`;
+
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1200,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
+
+    // 非同期でusage記録（失敗しても無視）
+    import("@/lib/track-usage").then(({ trackUsage }) =>
+      trackUsage({
+        operation: "eyecatch-illustration",
+        model: "claude-haiku-4-5-20251001",
+        inputTokens: msg.usage.input_tokens,
+        outputTokens: msg.usage.output_tokens,
+      }).catch(() => {})
+    ).catch(() => {});
+
+    // <g>〜</g> を抽出（Claude が余分なテキストを返した場合に対応）
+    const match = text.match(/<g[\s\S]*?<\/g>/);
+    return match ? match[0] : "";
+  } catch {
+    return "";
+  }
 }
 
 // ─── フォントを /tmp にキャッシュして resvg に渡す ──────────────────
@@ -299,7 +370,9 @@ export async function generateEyecatchPng(
   template: string | null | undefined,
   options: { keyword?: string; subtitle?: string; description?: string } = {}
 ): Promise<Buffer> {
-  const svg = generateEyecatchSvg(title, template, options);
+  const theme = (template ? THEMES[template] : undefined) ?? DEFAULT_THEME;
+  const illustration = await generateIllustrationGroup(title, template, theme);
+  const svg = generateEyecatchSvg(title, template, { ...options, illustration });
   const { Resvg } = await import("@resvg/resvg-js");
   const fontFiles = await getFontFiles();
   const resvg = new Resvg(svg, {
