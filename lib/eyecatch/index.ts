@@ -65,6 +65,18 @@ function centeredText(
   return `<g transform="translate(${dx},0)">${svg}</g>`;
 }
 
+// テキストの描画幅だけを測る（タイル幅の自動調整用）
+function measureTextWidth(text: string, fontSize: number): number {
+  const { jp, lat } = getFonts();
+  let penRef = 0;
+  for (const ch of [...text]) {
+    const f = jp.charToGlyph(ch).index ? jp : (lat.charToGlyph(ch).index ? lat : jp);
+    const glyph = f.charToGlyph(ch);
+    penRef += (glyph.advanceWidth ?? f.unitsPerEm) * (REF / f.unitsPerEm);
+  }
+  return penRef * (fontSize / REF);
+}
+
 type Theme = {
   gradA: string;  // グラデーション上端
   gradB: string;  // グラデーション中間
@@ -216,25 +228,24 @@ function layoutTitle(title: string): TitleLayout {
 }
 
 // ─── キーワードタイル分割 ─────────────────────────────────────────
+// キーワードを「意味のある単語」単位のタイルにする。
+// 1文字ずつに刻まない。長い語は丸ごと1タイル（幅は描画側で自動調整）。
 function splitKeyword(kw: string): string[] {
   if (!kw?.trim()) return [];
-  const segs = kw.trim().split(/[\s　\/・·、。]+/).filter(Boolean);
+  // 区切り文字（空白・中黒・スラッシュ・読点・vs など）で単語に分割
+  const segs = kw
+    .trim()
+    .split(/[\s　\/・·、。,]+|vs\.?|VS|×/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+
   const tiles: string[] = [];
   for (const seg of segs) {
-    if (tiles.length >= 5) break;
-    if (seg.length <= 2) {
-      tiles.push(seg);
-    } else if (/^[A-Za-z0-9]+$/.test(seg)) {
-      for (let i = 0; i < seg.length && tiles.length < 5; i += 2)
-        tiles.push(seg.slice(i, Math.min(i + 2, seg.length)));
-    } else {
-      for (const ch of [...seg]) {
-        if (tiles.length >= 5) break;
-        tiles.push(ch);
-      }
-    }
+    if (tiles.length >= 4) break;        // タイルは最大4語まで
+    if ([...seg].length > 8) continue;   // 長すぎる語はタイルに不向きなので除外
+    tiles.push(seg);
   }
-  return tiles.slice(0, 5);
+  return tiles;
 }
 
 // タイルの色: ベース色を少しずつ明るくしてグラデーション風に
@@ -292,18 +303,29 @@ export function generateEyecatchSvg(
   <polygon points="${bx+24},${by+bh} ${bx+10},${by+bh+22} ${bx+54},${by+bh}" fill="white" opacity="0.94"/>
   ${centeredText(bText, bx + bWidth/2, by + bh/2 + bFontSz*0.38, bFontSz, theme.bubble)}`;
 
-  // ─ キーワードタイル ────────────────────────────────────────────
-  const TW = 72, TH = 72, TGAP = 10;
-  const tilesSvg = kwTiles.length === 0 ? "" : kwTiles.map((seg, i) => {
-    const total = kwTiles.length;
-    const totalW = total * TW + (total - 1) * TGAP;
-    const tx = 1148 - totalW + i * (TW + TGAP);
-    const ty = 46;
-    const tfs = seg.length === 1 ? 36 : seg.length === 2 ? 28 : 22;
-    const color = tileColor(theme.tileBase, i, total);
-    return `
-  <rect x="${tx}" y="${ty}" width="${TW}" height="${TH}" rx="10" fill="${color}" opacity="0.92"/>
-  ${centeredText(seg, tx + TW/2, ty + TH/2 + tfs*0.38, tfs, "white")}`;
+  // ─ キーワードタイル（語ごとに幅を自動調整・右上に配置）──────────
+  const TFS = 26, TH = 50, TGAP = 10, TPADX = 16, TY = 46;
+  const RIGHT_EDGE = 1148;           // タイル右端
+  const TILE_BUDGET = 660;           // 右側に使える最大幅（吹き出しと重ねない）
+  // 各語の幅を測り、予算に収まる語だけ採用（意味が壊れる切り詰めはしない）
+  const fitted: { seg: string; w: number }[] = [];
+  let used = 0;
+  for (const seg of kwTiles) {
+    const tw = Math.round(measureTextWidth(seg, TFS)) + TPADX * 2;
+    const add = tw + (fitted.length > 0 ? TGAP : 0);
+    if (used + add > TILE_BUDGET) break;
+    fitted.push({ seg, w: tw });
+    used += add;
+  }
+  const totalW = fitted.reduce((s, t) => s + t.w, 0) + TGAP * Math.max(0, fitted.length - 1);
+  let tx = RIGHT_EDGE - totalW;
+  const tilesSvg = fitted.map((t, i) => {
+    const color = tileColor(theme.tileBase, i, fitted.length);
+    const rect = `
+  <rect x="${tx}" y="${TY}" width="${t.w}" height="${TH}" rx="10" fill="${color}" opacity="0.94"/>
+  ${centeredText(t.seg, tx + t.w / 2, TY + TH / 2 + TFS * 0.36, TFS, "white")}`;
+    tx += t.w + TGAP;
+    return rect;
   }).join("");
 
   // ─ 背景レイヤー: 写真があれば写真+スクリム、なければグラデーション ─
