@@ -17,7 +17,12 @@ const STATUS_LABEL: Record<string, string> = {
   publish: "公開", draft: "下書き", future: "予約", pending: "承認待ち", private: "非公開",
 };
 
-export function RewriteClient({ posts, currentYear }: { posts: WpPost[]; currentYear: number }) {
+export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
+  posts: WpPost[];
+  currentYear: number;
+  viewsMap: Record<number, number | null>;
+  gaConfigured: boolean;
+}) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [direction, setDirection] = useState(
     `記事全体を読み直し、不自然・分かりにくい箇所を自然な文章に書き直す。\n` +
@@ -133,7 +138,9 @@ export function RewriteClient({ posts, currentYear }: { posts: WpPost[]; current
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #dce1e8" }}>
           <input type="checkbox" checked={selected.size === posts.length && posts.length > 0} onChange={toggleAll} disabled={running} style={{ width: 16, height: 16 }} />
           <span style={{ fontSize: 13, fontWeight: 700 }}>全選択</span>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "#697587", fontFamily: "monospace" }}>WP {posts.length}件</span>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "#697587", fontFamily: "monospace" }}>
+            {gaConfigured ? "PV=直近365日" : ""} WP {posts.length}件
+          </span>
         </div>
 
         {posts.length === 0 && (
@@ -153,6 +160,9 @@ export function RewriteClient({ posts, currentYear }: { posts: WpPost[]; current
                 {STATUS_LABEL[p.status] ?? p.status}
               </span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "#161d2b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</span>
+              <span style={{ fontSize: 11.5, fontFamily: "monospace", flexShrink: 0, minWidth: 70, textAlign: "right", color: (viewsMap[p.id] ?? 0) > 0 ? "#0f766b" : "#9ba8b5" }} title="直近365日のPV">
+                {viewsMap[p.id] == null ? "—" : `${viewsMap[p.id]!.toLocaleString()} PV`}
+              </span>
               {p.date && <span style={{ fontSize: 11, color: "#9ba8b5", fontFamily: "monospace", flexShrink: 0 }}>{p.date.slice(0, 10)}</span>}
               {st && (
                 <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, textAlign: "right", color: st.state === "done" ? "#0f766b" : st.state === "error" ? "#c4453a" : "#b07d2e" }}>
