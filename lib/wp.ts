@@ -10,6 +10,8 @@ export interface WpPostInput {
   date?: string; // ISO 8601 for scheduled posts
   categories?: number[];
   tags?: number[];
+  slug?: string;     // URLスラッグ（英数推奨）
+  excerpt?: string;  // 抜粋＝メタディスクリプション
 }
 
 export interface WpPostResult {
@@ -47,6 +49,8 @@ export async function createDraftPost(input: WpPostInput): Promise<WpPostResult>
     ...(input.date ? { date: input.date } : {}),
     ...(input.categories?.length ? { categories: input.categories } : {}),
     ...(input.tags?.length ? { tags: input.tags } : {}),
+    ...(input.slug ? { slug: input.slug } : {}),
+    ...(input.excerpt ? { excerpt: input.excerpt } : {}),
   };
 
   // kawacoins.com はパーマリンク未設定のため ?rest_route= 形式を使用
@@ -186,7 +190,7 @@ export async function getWpPost(postId: number): Promise<{ title: string; conten
  * 既存WP投稿の本文（とタイトル）を更新する。公開状態は維持される。
  */
 export async function updatePostContent(
-  postId: number, input: { title?: string; content: string }
+  postId: number, input: { title?: string; content: string; excerpt?: string }
 ): Promise<void> {
   const base = getWpBase();
   const auth = getAuthHeader();
@@ -196,6 +200,7 @@ export async function updatePostContent(
     body: JSON.stringify({
       content: input.content,
       ...(input.title ? { title: input.title } : {}),
+      ...(input.excerpt ? { excerpt: input.excerpt } : {}),
     }),
   });
   if (!res.ok) {

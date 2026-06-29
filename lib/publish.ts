@@ -173,9 +173,92 @@ export class PublishError extends Error {
 type ArticleRow = typeof articles.$inferSelect;
 type ExpRow = { label: string; choice: string | null; note: string | null };
 
-// テンプレ記事の最終HTMLを組み立てる（体験ポリッシュ→図表→アフィリ→FAQ→装飾）。
+export interface SeoAssets { metaDescription: string; summary: string[]; slug: string }
+
+// メタディスクリプション・冒頭要点・英数スラッグをまとめて1回のAI呼び出しで生成。
+// キー未設定/失敗時は空（その場合は各機能をスキップ）。
+async function generateSeoAssets(title: string, keyword: string | null | undefined, bodyMd: string): Promise<SeoAssets> {
+  const fallback: SeoAssets = { metaDescription: "", summary: [], slug: "" };
+  if (!process.env.ANTHROPIC_API_KEY) return fallback;
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 700,
+      messages: [{
+        role: "user",
+        content: `投資記事のSEO要素を作ってください。
+
+タイトル: ${title}
+キーワード: ${keyword ?? "なし"}
+本文(抜粋): ${bodyMd.slice(0, 1800)}
+
+次のJSONのみ返す:
+{
+  "metaDescription": "検索結果用の説明文。110字以内。キーワードを含め、読みたくなる自然文。誇張・煽りNG",
+  "summary": ["記事の要点を3つ。各40字以内。結論先出しで具体的に"],
+  "slug": "英小文字とハイフンのみの短いURLスラッグ。3〜5語。内容を表す英単語"
+}`,
+      }],
+    });
+    void trackUsage({ operation: "seo_assets", model: "claude-haiku-4-5", inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens });
+    const text = msg.content.filter(b => b.type === "text").map(b => (b as { text: string }).text).join("").trim();
+    const json = text.match(/\{[\s\S]*\}/);
+    if (!json) return fallback;
+    const o = JSON.parse(json[0]) as Partial<SeoAssets>;
+    let slug = (o.slug ?? "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    if (slug.length < 3) slug = "";
+    return {
+      metaDescription: (o.metaDescription ?? "").slice(0, 120),
+      summary: Array.isArray(o.summary) ? o.summary.slice(0, 3).map(s => String(s)) : [],
+      slug,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+// 運営者ボックス（E-E-A-T。実体験・実務経験の範囲のみ。資格詐称はしない）
+const AUTHOR_BOX = `
+<div style="border:1px solid #e3e6ea;background:#f7f8fa;border-radius:12px;padding:16px 18px;margin:30px 0;display:flex;gap:14px;align-items:flex-start">
+  <div style="width:46px;height:46px;border-radius:50%;background:#0f766b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0">カ</div>
+  <div style="font-size:14px;line-height:1.75;color:#374151">
+    <strong style="color:#1f2937">運営者：カワコイン</strong><br>
+    個人投資家。株式投資の実体験とビジネスの実務経験をもとに、制度や数字を「個人のキャリア・ライフプランにどう効くか」という実践的な視点で解説しています。
+    <span style="display:block;margin-top:6px;font-size:12px;color:#6b7280">※本記事は一般的な情報提供であり、特定の銘柄・商品の売買を推奨するものではありません。投資の最終判断はご自身でお願いします。</span>
+  </div>
+</div>`;
+
+// 冒頭の要点サマリー（AIO/離脱対策）
+function summaryBox(items: string[]): string {
+  if (!items?.length) return "";
+  return `<div style="border:1px solid #cfe0dc;background:#f1f7f5;border-radius:12px;padding:16px 18px;margin:0 0 24px">
+  <div style="font-size:13px;font-weight:700;color:#0f766b;margin-bottom:8px">この記事の要点（30秒まとめ）</div>
+  <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.85;color:#374151">${items.map(i => `<li>${i}</li>`).join("")}</ul>
+</div>`;
+}
+
+// FAQ の構造化データ(JSON-LD)。テーマと重複しにくい FAQPage のみ。
+function faqJsonLd(faq: { question: string; answer: string }[]): string {
+  if (!faq?.length) return "";
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.map(f => ({
+      "@type": "Question",
+      name: f.question,
+      acceptedAnswer: { "@type": "Answer", text: f.answer },
+    })),
+  };
+  // </script> 混入や HTML 解釈を防ぐためエスケープ
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  return `\n<script type="application/ld+json">${json}</script>`;
+}
+
+// テンプレ記事の最終HTMLを組み立てる（要点→体験ポリッシュ→図表→アフィリ→FAQ→装飾→著者→構造化）。
 // publish と「公開中のまま更新」で共通利用する。
-async function buildTemplateHtml(article: ArticleRow, exps: ExpRow[]): Promise<string> {
+async function buildTemplateHtml(article: ArticleRow, exps: ExpRow[], summary: string[] = []): Promise<string> {
   let bodyMd = article.bodyMd;
   const polished = await polishExperiences(exps, article.title);
   for (const exp of exps) {
@@ -195,7 +278,10 @@ async function buildTemplateHtml(article: ArticleRow, exps: ExpRow[]): Promise<s
   bodyHtml = bodyHtml.replace(/\[FAQ\]/g, "");
 
   bodyHtml = applyJinRFormat(bodyHtml);
-  return injectAffiliateRel(bodyHtml);
+  bodyHtml = injectAffiliateRel(bodyHtml);
+
+  // 冒頭に要点サマリー、末尾に著者ボックス＋FAQ構造化データ
+  return summaryBox(summary) + bodyHtml + AUTHOR_BOX + faqJsonLd(faqData);
 }
 
 // 公開中のWP記事を、現在のDB内容で「その場で」更新する（再投稿不要）。
@@ -216,10 +302,15 @@ export async function updatePublishedArticle(articleId: string): Promise<Publish
     ? await db.select().from(experiences).where(eq(experiences.articleId, articleId))
     : [];
 
-  const html = await buildTemplateHtml(article, exps);
+  // SEO要素（要点・メタdescription）を生成。スラッグは既存URLを変えないため更新しない。
+  const seo = await generateSeoAssets(article.title, topicRow?.keyword, article.bodyMd);
+  const html = await buildTemplateHtml(article, exps, seo.summary);
 
-  // 本文を差し替え（公開状態は維持される）
-  await updatePostContent(article.wpPostId, { title: article.title, content: html });
+  // 本文を差し替え（公開状態は維持される）＋メタdescriptionを抜粋に設定
+  await updatePostContent(article.wpPostId, {
+    title: article.title, content: html,
+    ...(seo.metaDescription ? { excerpt: seo.metaDescription } : {}),
+  });
 
   // カテゴリ・タグを再付与
   const { wpCategories, wpTags } = await resolveWpTaxonomy(article.title, topicRow?.keyword, article.template);
@@ -271,8 +362,11 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
         throw new PublishError(`体験スロットが未充足です: ${missing.join(", ")}`, 422);
       }
 
-      // ②〜⑥ 本文HTMLを組み立て（体験ポリッシュ・図表・アフィリ・FAQ・装飾）
-      const html = await buildTemplateHtml(article, exps);
+      // SEO要素（要点・メタdescription・英数スラッグ）を生成
+      const seo = await generateSeoAssets(article.title, topicRow?.keyword, article.bodyMd);
+
+      // ②〜⑥ 本文HTMLを組み立て（要点・体験ポリッシュ・図表・アフィリ・FAQ・装飾・著者・構造化）
+      const html = await buildTemplateHtml(article, exps, seo.summary);
 
       if (!process.env.WP_BASE_URL) {
         await db.update(articles).set({ status: "published", publishedAt: new Date() }).where(eq(articles.id, articleId));
@@ -287,6 +381,9 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
       const wpResult = await createDraftPost({
         title: article.title, content: html, status: "draft",
         categories: wpCategories, tags: wpTags,
+        // 新規投稿のみ英数スラッグとメタdescriptionを設定（既存URLは変えない）
+        ...(seo.slug ? { slug: seo.slug } : {}),
+        ...(seo.metaDescription ? { excerpt: seo.metaDescription } : {}),
       });
       await db.update(articles).set({ status: "published", wpPostId: wpResult.id, publishedAt: new Date() }).where(eq(articles.id, articleId));
 
