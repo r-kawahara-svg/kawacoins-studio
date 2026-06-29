@@ -41,7 +41,7 @@ export function applyJinRFormat(html: string): string {
     (_, content: string) => {
       const inner = content.trim().replace(/^<p>/i, "").replace(/<\/p>\s*$/i, "").trim();
       return `<div style="border:1px solid #c7b9e8;background:#f6f2fc;border-radius:12px;padding:14px 18px;margin:22px 0">
-  <div style="font-size:12px;font-weight:700;color:#6d28d9;margin-bottom:6px;letter-spacing:0.4px">💡 コンサル視点の考察</div>
+  <div style="font-size:12px;font-weight:700;color:#6d28d9;margin-bottom:6px;letter-spacing:0.4px">💡 考察</div>
   <div style="font-size:15px;line-height:1.75;color:#2d2a3a">${inner}</div>
 </div>`;
     }
