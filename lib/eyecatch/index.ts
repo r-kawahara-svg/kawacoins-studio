@@ -128,7 +128,7 @@ const DEFAULT_UNSPLASH_KEYWORD = "finance money investment";
 
 // Unsplash からランダム写真を取得し base64 data URI で返す。
 // UNSPLASH_ACCESS_KEY 未設定・失敗時は null（グラデーション背景にフォールバック）。
-async function fetchUnsplashPhoto(keyword: string): Promise<string | null> {
+export async function fetchUnsplashPhoto(keyword: string): Promise<string | null> {
   const key = process.env.UNSPLASH_ACCESS_KEY;
   if (!key) return null;
   try {

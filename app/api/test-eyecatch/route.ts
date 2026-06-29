@@ -10,7 +10,13 @@ export async function GET(req: Request) {
   const diag: Record<string, unknown> = {};
 
   try {
-    const { generateEyecatchSvg, generateEyecatchPng } = await import("@/lib/eyecatch");
+    const { generateEyecatchSvg, generateEyecatchPng, fetchUnsplashPhoto } = await import("@/lib/eyecatch");
+
+    // Unsplash 写真背景の状況を確認
+    diag.unsplashKeySet = !!process.env.UNSPLASH_ACCESS_KEY;
+    const photo = await fetchUnsplashPhoto("finance money investment");
+    diag.photoFetched = !!photo;
+    diag.photoBytes = photo ? Math.round((photo.length * 3) / 4) : 0; // base64 概算バイト数
 
     const svg = generateEyecatchSvg("文字テスト日本語サンプル", "T6", {
       keyword: "iDeCo 節税",
