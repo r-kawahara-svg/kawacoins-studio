@@ -12,6 +12,7 @@ interface ArticleRow {
 }
 
 type RunState = "idle" | "running" | "done" | "error";
+type RunResult = { state: RunState; detail?: string };
 
 const TEMPLATE_COLORS: Record<string, string> = {
   T1: "#1a9a82", T2: "#2264cc", T3: "#207840",
@@ -26,7 +27,7 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
     `会話吹き出し（読者の疑問→筆者の回答）と「考察」ボックスなど最新の装飾を適切に盛り込み、読みやすくする。`
   );
   const [running, setRunning] = useState(false);
-  const [results, setResults] = useState<Record<string, RunState>>({});
+  const [results, setResults] = useState<Record<string, RunResult>>({});
   const [current, setCurrent] = useState<string | null>(null);
 
   const PRESETS: { label: string; text: string }[] = [
@@ -69,16 +70,23 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
     const ids = articles.filter(a => selected.has(a.id)).map(a => a.id);
     for (const id of ids) {
       setCurrent(id);
-      setResults((r) => ({ ...r, [id]: "running" }));
+      setResults((r) => ({ ...r, [id]: { state: "running" } }));
       try {
         const res = await fetch(`/api/articles/${id}/rewrite`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ direction }),
         });
-        setResults((r) => ({ ...r, [id]: res.ok ? "done" : "error" }));
-      } catch {
-        setResults((r) => ({ ...r, [id]: "error" }));
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setResults((r) => ({ ...r, [id]: { state: "error", detail: data.error ?? `HTTP ${res.status}` } }));
+        } else if (data.updatedLive) {
+          setResults((r) => ({ ...r, [id]: { state: "done", detail: "公開中を直接更新" } }));
+        } else {
+          setResults((r) => ({ ...r, [id]: { state: "done", detail: data.reason ?? "下書き更新（編集画面へ）" } }));
+        }
+      } catch (e) {
+        setResults((r) => ({ ...r, [id]: { state: "error", detail: String(e) } }));
       }
     }
     setCurrent(null);
@@ -86,7 +94,7 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
     router.refresh();
   }
 
-  const doneCount = Object.values(results).filter(s => s === "done").length;
+  const doneCount = Object.values(results).filter(s => s.state === "done").length;
 
   return (
     <div>
@@ -161,8 +169,9 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "#161d2b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</span>
               <span style={{ fontSize: 11, color: "#9ba8b5", fontFamily: "monospace", flexShrink: 0 }}>{a.status}</span>
               {st && (
-                <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: st === "done" ? "#0f766b" : st === "error" ? "#c4453a" : "#b07d2e" }}>
-                  {st === "running" ? "処理中…" : st === "done" ? "✓ 完了" : st === "error" ? "失敗" : ""}
+                <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, textAlign: "right", color: st.state === "done" ? "#0f766b" : st.state === "error" ? "#c4453a" : "#b07d2e" }}>
+                  {st.state === "running" ? "処理中…" : st.state === "done" ? "✓ 完了" : st.state === "error" ? "失敗" : ""}
+                  {st.detail && <span style={{ display: "block", fontWeight: 400, fontSize: 10, color: "#697587" }}>{st.detail}</span>}
                 </span>
               )}
             </label>

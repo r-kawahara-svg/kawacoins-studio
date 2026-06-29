@@ -239,16 +239,19 @@ JSON のみ返してください。`;
     }
   }
 
+  const diag = { wpPostId: article.wpPostId, prevStatus: article.status, templateChanged };
+
   // 公開中 & テンプレ変更なし → 公開状態のままWPをその場で更新（再投稿不要）
   if (article.wpPostId && !templateChanged) {
     await db.update(articles).set({ bodyMd, visuals, faq }).where(eq(articles.id, articleId));
     try {
       const { updatePublishedArticle } = await import("@/lib/publish");
-      await updatePublishedArticle(articleId);
-      return NextResponse.json({ ok: true, updatedLive: true, visualsCount: visuals.length, faqCount: faq.length });
+      const r = await updatePublishedArticle(articleId);
+      return NextResponse.json({ ok: true, updatedLive: true, ...diag, result: r, visualsCount: visuals.length, faqCount: faq.length });
     } catch (e) {
+      console.error("[rewrite] updatePublishedArticle failed:", e instanceof Error ? e.stack ?? e.message : e);
       return NextResponse.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        { ok: false, ...diag, error: e instanceof Error ? e.message : String(e) },
         { status: 500 }
       );
     }
@@ -265,5 +268,9 @@ JSON のみ返してください。`;
     publishedAt: null,
   }).where(eq(articles.id, articleId));
 
-  return NextResponse.json({ ok: true, updatedLive: false, visualsCount: visuals.length, faqCount: faq.length });
+  return NextResponse.json({
+    ok: true, updatedLive: false, ...diag,
+    reason: !article.wpPostId ? "DB上この記事は未公開(wpPostId無し)のため下書き更新" : "テンプレ変更のため下書き更新",
+    visualsCount: visuals.length, faqCount: faq.length,
+  });
 }
