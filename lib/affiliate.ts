@@ -178,10 +178,14 @@ ${trackingPixels}
  */
 export async function replaceAffiliatePlaceholders(bodyMd: string): Promise<string> {
   const map = await buildAffiliateMap();
+  // 同一広告の重複描画を防ぐ（同じプログラムは記事内で1回だけ表示）
+  const usedPrograms = new Set<string>();
 
   return bodyMd.replace(/\[AFFILIATE:([^\]]+)\]/g, (_, theme: string) => {
     const row = map.get(theme.trim());
     if (!row) return "";
+    if (usedPrograms.has(row.id)) return ""; // 2回目以降の同一広告は出さない
+    usedPrograms.add(row.id);
     // アンカーテキストをスニペットから抽出してコピー選択に使う
     const anchorMatch = row.htmlSnippet.match(/<a [^>]*>([^<]+)<\/a>/i);
     const anchorText = anchorMatch?.[1]?.trim() ?? "";
