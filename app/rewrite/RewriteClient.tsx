@@ -1,59 +1,49 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
-interface ArticleRow {
-  id: string;
+interface WpPost {
+  id: number;
   title: string;
-  template: string | null;
+  link: string;
   status: string;
-  wpPostId: number | null;
+  date: string;
 }
 
-type RunState = "idle" | "running" | "done" | "error";
+type RunState = "running" | "done" | "error";
 type RunResult = { state: RunState; detail?: string };
 
-const TEMPLATE_COLORS: Record<string, string> = {
-  T1: "#1a9a82", T2: "#2264cc", T3: "#207840",
-  T4: "#3d4fb8", T5: "#b83030", T6: "#2b5c8c",
+const STATUS_LABEL: Record<string, string> = {
+  publish: "公開", draft: "下書き", future: "予約", pending: "承認待ち", private: "非公開",
 };
 
-export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[]; currentYear: number }) {
-  const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+export function RewriteClient({ posts, currentYear }: { posts: WpPost[]; currentYear: number }) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [direction, setDirection] = useState(
-    `本文の年号・情報を${currentYear}年の最新版に更新する。古い年号や「今年」表現は全て${currentYear}年に直す。\n` +
-    `会話吹き出し（読者の疑問→筆者の回答）と「考察」ボックスなど最新の装飾を適切に盛り込み、読みやすくする。`
+    `記事全体を読み直し、不自然・分かりにくい箇所を自然な文章に書き直す。\n` +
+    `走り書きのようなコメント（例「安いので！」）は理由や文脈を補って整える。\n` +
+    `古い年号や「今年」は${currentYear}年基準に直す。事実や数値は変えない。`
   );
   const [running, setRunning] = useState(false);
-  const [results, setResults] = useState<Record<string, RunResult>>({});
-  const [current, setCurrent] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<number, RunResult>>({});
+  const [current, setCurrent] = useState<number | null>(null);
 
   const PRESETS: { label: string; text: string }[] = [
     {
       label: `📅 最新年(${currentYear})に更新`,
-      text: `本文の年号・情報を${currentYear}年の最新版に更新する。古い年号や「今年」「最新」表現は全て${currentYear}年基準に直す。未確定の制度は「予定」「審議中」と明記する。`,
-    },
-    {
-      label: "✨ 最新の装飾を適用",
-      text: `会話吹き出し（[TALK:reader]→[TALK:author]）を2〜3ペア、難しい箇所の前に入れる。説明型の記事なら「考察」([INSIGHT])で実践的な独自視点を加える。読みやすく段落を整える。`,
+      text: `古い年号や「今年」「最新」表現を${currentYear}年基準に直す。未確定の制度は「予定」「審議中」と明記し断定しない。事実・数値は変えない。`,
     },
     {
       label: "🔍 全体を見直して整える",
-      text: `記事全体を読み直し、不自然・分かりにくい箇所を書き直す。具体的には:\n` +
-        `・走り書きのような不自然なコメント（例「安いので！」）を、理由や文脈を補って自然な文章にする\n` +
-        `・回りくどい/冗長な文、唐突な言い回し、意味の通らない箇所を直す\n` +
-        `・本文とFAQ・吹き出しの内容やトーンの食い違いを揃える\n` +
-        `・事実や数値は変えず、表現と読みやすさだけを改善する`,
+      text: `記事全体を読み直し、不自然・分かりにくい箇所を書き直す。走り書きのようなコメント（例「安いので！」）は理由や文脈を補って自然な文章にする。回りくどい/冗長な文や唐突な言い回しも直す。事実や数値は変えず、表現と読みやすさだけ改善する。`,
     },
     {
-      label: "🔁 全部入り更新",
-      text: `本文を${currentYear}年の最新情報に更新（古い年号は直す・未確定は「予定」と明記）。\n会話吹き出しと「考察」など最新の装飾を盛り込み、CTA直前ではデメリットを紹介サービスがどう解消するかを1文で結びつける。\n全体を読み直して不自然な箇所（走り書きのようなコメント等）も自然に書き直し、読みやすく整える。`,
+      label: "🔁 最新年＋全体見直し",
+      text: `古い年号や「今年」は${currentYear}年基準に直し（未確定は「予定」と明記）、記事全体を読み直して不自然な箇所（走り書きコメント等）を自然な文章に整える。事実や数値は変えない。`,
     },
   ];
 
-  function toggle(id: string) {
+  function toggle(id: number) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -61,29 +51,27 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
     });
   }
   function toggleAll() {
-    setSelected((prev) => prev.size === articles.length ? new Set() : new Set(articles.map(a => a.id)));
+    setSelected((prev) => prev.size === posts.length ? new Set() : new Set(posts.map(p => p.id)));
   }
 
   async function run() {
     if (selected.size === 0 || !direction.trim()) return;
     setRunning(true);
-    const ids = articles.filter(a => selected.has(a.id)).map(a => a.id);
+    const ids = posts.filter(p => selected.has(p.id)).map(p => p.id);
     for (const id of ids) {
       setCurrent(id);
       setResults((r) => ({ ...r, [id]: { state: "running" } }));
       try {
-        const res = await fetch(`/api/articles/${id}/rewrite`, {
+        const res = await fetch(`/api/wp-rewrite`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction }),
+          body: JSON.stringify({ postId: id, direction }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setResults((r) => ({ ...r, [id]: { state: "error", detail: data.error ?? `HTTP ${res.status}` } }));
-        } else if (data.updatedLive) {
-          setResults((r) => ({ ...r, [id]: { state: "done", detail: "公開中を直接更新" } }));
+        if (res.ok && data.ok) {
+          setResults((r) => ({ ...r, [id]: { state: "done", detail: "WP記事を更新しました" } }));
         } else {
-          setResults((r) => ({ ...r, [id]: { state: "done", detail: data.reason ?? "下書き更新（編集画面へ）" } }));
+          setResults((r) => ({ ...r, [id]: { state: "error", detail: data.error ?? `HTTP ${res.status}` } }));
         }
       } catch (e) {
         setResults((r) => ({ ...r, [id]: { state: "error", detail: String(e) } }));
@@ -91,7 +79,6 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
     }
     setCurrent(null);
     setRunning(false);
-    router.refresh();
   }
 
   const doneCount = Object.values(results).filter(s => s.state === "done").length;
@@ -120,7 +107,7 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
             fontSize: 14, color: "#161d2b", background: "#fff", boxSizing: "border-box", fontFamily: "inherit", lineHeight: 1.6,
           }}
         />
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
           <button onClick={run} disabled={running || selected.size === 0 || !direction.trim()} style={{
             background: running || selected.size === 0 ? "#9fb4ae" : "#0f766b",
             color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px",
@@ -136,41 +123,40 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
             ) : `選択した ${selected.size} 件をリライト`}
           </button>
           <span style={{ fontSize: 12, color: "#697587" }}>
-            公開中の記事はそのまま直接更新されます（再投稿不要）。未公開の記事は「編集画面」に入ります
+            WordPress記事を直接書き換えます（公開状態のまま・再投稿不要）
           </span>
         </div>
       </div>
 
-      {/* 記事一覧 */}
+      {/* WP記事一覧 */}
       <div style={{ background: "#fff", border: "1px solid #dce1e8", borderRadius: 12, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #dce1e8" }}>
-          <input type="checkbox" checked={selected.size === articles.length && articles.length > 0} onChange={toggleAll} disabled={running} style={{ width: 16, height: 16 }} />
+          <input type="checkbox" checked={selected.size === posts.length && posts.length > 0} onChange={toggleAll} disabled={running} style={{ width: 16, height: 16 }} />
           <span style={{ fontSize: 13, fontWeight: 700 }}>全選択</span>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "#697587", fontFamily: "monospace" }}>{articles.length}件</span>
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#697587", fontFamily: "monospace" }}>WP {posts.length}件</span>
         </div>
 
-        {articles.length === 0 && (
-          <div style={{ padding: "32px", textAlign: "center", color: "#697587", fontSize: 13 }}>記事がありません</div>
+        {posts.length === 0 && (
+          <div style={{ padding: "32px", textAlign: "center", color: "#697587", fontSize: 13 }}>WordPress記事がありません</div>
         )}
 
-        {articles.map((a) => {
-          const tcolor = TEMPLATE_COLORS[a.template ?? ""] ?? "#697587";
-          const st = results[a.id];
+        {posts.map((p) => {
+          const st = results[p.id];
           return (
-            <label key={a.id} style={{
+            <label key={p.id} style={{
               display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
               borderBottom: "1px solid #eef1f5", cursor: running ? "default" : "pointer",
-              background: current === a.id ? "#f0fdf4" : "#fff",
+              background: current === p.id ? "#f0fdf4" : "#fff",
             }}>
-              <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggle(a.id)} disabled={running} style={{ width: 16, height: 16, flexShrink: 0 }} />
-              {a.template && (
-                <span style={{ background: tcolor, color: "#fff", borderRadius: 5, padding: "2px 8px", fontSize: 10.5, fontWeight: 700, fontFamily: "monospace", flexShrink: 0 }}>{a.template}</span>
-              )}
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "#161d2b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</span>
-              <span style={{ fontSize: 11, color: "#9ba8b5", fontFamily: "monospace", flexShrink: 0 }}>{a.status}</span>
+              <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} disabled={running} style={{ width: 16, height: 16, flexShrink: 0 }} />
+              <span style={{ background: "#eef2f7", color: "#475569", borderRadius: 5, padding: "2px 8px", fontSize: 10.5, fontWeight: 700, fontFamily: "monospace", flexShrink: 0 }}>
+                {STATUS_LABEL[p.status] ?? p.status}
+              </span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "#161d2b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</span>
+              {p.date && <span style={{ fontSize: 11, color: "#9ba8b5", fontFamily: "monospace", flexShrink: 0 }}>{p.date.slice(0, 10)}</span>}
               {st && (
                 <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, textAlign: "right", color: st.state === "done" ? "#0f766b" : st.state === "error" ? "#c4453a" : "#b07d2e" }}>
-                  {st.state === "running" ? "処理中…" : st.state === "done" ? "✓ 完了" : st.state === "error" ? "失敗" : ""}
+                  {st.state === "running" ? "処理中…" : st.state === "done" ? "✓ 完了" : "失敗"}
                   {st.detail && <span style={{ display: "block", fontWeight: 400, fontSize: 10, color: "#697587" }}>{st.detail}</span>}
                 </span>
               )}

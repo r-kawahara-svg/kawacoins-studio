@@ -123,6 +123,65 @@ export async function setFeaturedMedia(postId: number, mediaId: number): Promise
 
 interface WpTerm { id: number; name: string; slug: string; count: number; }
 
+export interface WpPostSummary {
+  id: number;
+  title: string;
+  link: string;
+  status: string;
+  date: string;
+}
+
+/**
+ * WordPress の投稿一覧を取得する（最大100件）。
+ * context=edit + 認証で下書き含む全ステータスを取得。
+ */
+export async function listWpPosts(): Promise<WpPostSummary[]> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+  const url = `${base}/?rest_route=/wp/v2/posts&per_page=100&status=any&context=edit&orderby=date&order=desc`;
+  const res = await fetch(url, { headers: { Authorization: auth } });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`WordPress listPosts error ${res.status}: ${text}`);
+  }
+  const rows = await res.json() as Array<{
+    id: number;
+    title?: { rendered?: string; raw?: string };
+    link?: string;
+    status?: string;
+    date?: string;
+  }>;
+  return rows.map(p => ({
+    id: p.id,
+    title: (p.title?.raw || p.title?.rendered || "(無題)").replace(/<[^>]+>/g, "").trim(),
+    link: p.link ?? "",
+    status: p.status ?? "",
+    date: p.date ?? "",
+  }));
+}
+
+/**
+ * WordPress の投稿1件の本文(HTML)とタイトルを取得する。
+ */
+export async function getWpPost(postId: number): Promise<{ title: string; contentHtml: string }> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+  const url = `${base}/?rest_route=/wp/v2/posts/${postId}&context=edit`;
+  const res = await fetch(url, { headers: { Authorization: auth } });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`WordPress getPost error ${res.status}: ${text}`);
+  }
+  const p = await res.json() as {
+    title?: { rendered?: string; raw?: string };
+    content?: { rendered?: string; raw?: string };
+  };
+  return {
+    title: (p.title?.raw || p.title?.rendered || "").replace(/<[^>]+>/g, "").trim(),
+    contentHtml: p.content?.raw || p.content?.rendered || "",
+  };
+}
+
 /**
  * 既存WP投稿の本文（とタイトル）を更新する。公開状態は維持される。
  */
