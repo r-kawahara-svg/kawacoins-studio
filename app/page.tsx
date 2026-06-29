@@ -5,8 +5,16 @@ import Link from "next/link";
 import { listWpPosts } from "@/lib/wp";
 import { getPageMetrics, lookupMetric } from "@/lib/analytics";
 import { gradeOf, GRADE_STYLE, GRADE_FALLBACK } from "@/lib/grade";
+import { analyzeCategories } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
+
+const CAT_STATUS_STYLE: Record<string, { bg: string; text: string }> = {
+  未着手: { bg: "#fae3e1", text: "#9c4f47" },
+  不足: { bg: "#f8eccf", text: "#8a6d2f" },
+  普通: { bg: "#eef0f3", text: "#5b6470" },
+  充実: { bg: "#dcebe0", text: "#2f5d3a" },
+};
 
 export default async function DashboardPage() {
   const [topicCount] = await db.select({ count: count() }).from(topics).where(eq(topics.status, "new"));
@@ -27,6 +35,11 @@ export default async function DashboardPage() {
   const totalUsers = ranked.reduce((s, r) => s + (r.metric?.users ?? 0), 0);
   const top = ranked.slice(0, 5);
   const maxViews = Math.max(1, ...top.map(r => r.metric?.views ?? 0));
+
+  // カテゴリ分析（世の中の投資記事カテゴリ基準との充足度）
+  const cats = analyzeCategories(posts.map(p => p.title));
+  const gapCount = cats.filter(c => c.status === "未着手").length;
+  const lowCount = cats.filter(c => c.status === "不足").length;
 
   const metrics = [
     { label: "合計PV（365日）", value: pm.configured ? totalViews.toLocaleString() : "—", accent: true },
@@ -124,6 +137,41 @@ export default async function DashboardPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* カテゴリ分析 */}
+      <div style={{ ...card, overflow: "hidden", marginTop: 24 }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #eef0f3" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>カテゴリ分析</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, lineHeight: 1.6 }}>
+            世の中の投資記事カテゴリと比べた充足度です。
+            {(gapCount > 0 || lowCount > 0)
+              ? <> <strong style={{ color: "#9c4f47" }}>未着手 {gapCount}</strong> / <strong style={{ color: "#8a6d2f" }}>不足 {lowCount}</strong> — まずここを埋めると網羅性が上がります。</>
+              : <> 主要カテゴリは概ねカバーできています。</>}
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 0 }}>
+          {cats.map((c) => {
+            const ss = CAT_STATUS_STYLE[c.status];
+            return (
+              <div key={c.key} style={{ padding: "12px 18px", borderBottom: "1px solid #eef0f3", borderRight: "1px solid #eef0f3" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "#1f2937" }}>{c.label}</span>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", color: "#6b7280" }}>{c.count}本</span>
+                  <span style={{ background: ss.bg, color: ss.text, borderRadius: 5, padding: "2px 7px", fontSize: 10.5, fontWeight: 700, flexShrink: 0 }}>{c.status}</span>
+                </div>
+                {(c.status === "未着手" || c.status === "不足") && (
+                  <div style={{ fontSize: 11, color: "#9aa3af", marginTop: 4, lineHeight: 1.5 }}>{c.why}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ padding: "12px 18px", textAlign: "right" }}>
+          <Link href="/topics" style={{ fontSize: 12.5, color: "#0f766b", fontWeight: 700, textDecoration: "none" }}>
+            不足カテゴリのネタを作る →
+          </Link>
+        </div>
       </div>
     </div>
   );

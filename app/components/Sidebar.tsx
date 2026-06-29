@@ -190,12 +190,23 @@ export function Sidebar({ bypass }: Props) {
 
   // ── 共通パーツ ───────────────────────────────────────────
   const Logo = () => (
-    <div style={{ padding: "20px 20px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#0f766b" }} />
-        <span style={{ color: C.brand, fontWeight: 800, fontSize: 14, fontFamily: "monospace" }}>記事スタジオ</span>
+    <div style={{ padding: "20px 20px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+      {/* ブランドアイコン（ペン×グラフのモノグラム） */}
+      <span style={{
+        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+        background: "linear-gradient(135deg,#0f766b 0%,#15937f 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 2px 6px rgba(15,118,107,.28)",
+      }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19V10" /><path d="M10 19V5" /><path d="M16 19v-6" />
+          <path d="M20.5 4.5l-2.8 2.8" /><path d="M21 8V4h-4" />
+        </svg>
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: C.brand, fontWeight: 800, fontSize: 14.5 }}>記事スタジオ</div>
+        <div style={{ fontSize: 10.5, color: C.sub, fontFamily: "monospace" }}>kawacoins.com</div>
       </div>
-      <div style={{ fontSize: 10, color: C.sub, fontFamily: "monospace", paddingLeft: 16 }}>kawacoins.com</div>
     </div>
   );
 
