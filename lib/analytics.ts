@@ -1,14 +1,26 @@
 /**
  * Google Analytics (GA4) Data API 連携。
- * ページパス別の閲覧数(PV)を取得する。
+ * ページパス別の指標（PV・ユーザー数・平均エンゲージ時間）を取得する。
  *
  * 必要な環境変数:
  *   GA4_PROPERTY_ID        … GA4 プロパティID（数字のみ。例: 123456789）
  *   GA_SERVICE_ACCOUNT_JSON … サービスアカウントのJSON文字列（GA4プロパティに閲覧権限を付与）
  */
 
+export interface PageMetric {
+  views: number;        // ページビュー
+  users: number;        // ユーザー数
+  engagementSec: number; // 1ユーザーあたり平均エンゲージ時間(秒)
+}
+
+export interface PageMetrics {
+  byPath: Map<string, PageMetric>;
+  configured: boolean;
+  error?: string;
+}
+
+// 後方互換（PVのみ）
 export interface PageViews {
-  // 正規化したパス(+クエリ) → PV
   byPath: Map<string, number>;
   configured: boolean;
   error?: string;
@@ -17,23 +29,21 @@ export interface PageViews {
 function normalizePath(p: string): string {
   try {
     let path = p;
-    // フルURLならパス+クエリを取り出す
     if (/^https?:\/\//i.test(p)) {
       const u = new URL(p);
       path = u.pathname + u.search;
     }
     path = decodeURIComponent(path);
-    if (path.length > 1) path = path.replace(/\/$/, ""); // 末尾スラッシュ除去
+    if (path.length > 1) path = path.replace(/\/$/, "");
     return path.toLowerCase();
   } catch {
     return p.toLowerCase();
   }
 }
 
-let cached: { at: number; data: PageViews } | null = null;
+let cached: { at: number; data: PageMetrics } | null = null;
 
-// GA4 から直近 N 日のページPVを取得（5分キャッシュ）
-export async function getPageViews(days = 365): Promise<PageViews> {
+export async function getPageMetrics(days = 365): Promise<PageMetrics> {
   const propertyId = process.env.GA4_PROPERTY_ID;
   const saJson = process.env.GA_SERVICE_ACCOUNT_JSON;
   if (!propertyId || !saJson) {
@@ -56,17 +66,25 @@ export async function getPageViews(days = 365): Promise<PageViews> {
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate: `${days}daysAgo`, endDate: "today" }],
       dimensions: [{ name: "pagePathPlusQueryString" }],
-      metrics: [{ name: "screenPageViews" }],
+      metrics: [
+        { name: "screenPageViews" },
+        { name: "totalUsers" },
+        { name: "userEngagementDuration" }, // 全体の合計秒
+      ],
       limit: 5000,
     });
 
-    const byPath = new Map<string, number>();
+    const byPath = new Map<string, PageMetric>();
     for (const row of resp.rows ?? []) {
       const path = row.dimensionValues?.[0]?.value ?? "";
+      if (!path) continue;
       const views = Number(row.metricValues?.[0]?.value ?? "0");
-      if (path) byPath.set(normalizePath(path), views);
+      const users = Number(row.metricValues?.[1]?.value ?? "0");
+      const engTotal = Number(row.metricValues?.[2]?.value ?? "0");
+      const engagementSec = users > 0 ? Math.round(engTotal / users) : 0;
+      byPath.set(normalizePath(path), { views, users, engagementSec });
     }
-    const data: PageViews = { byPath, configured: true };
+    const data: PageMetrics = { byPath, configured: true };
     cached = { at: Date.now(), data };
     return data;
   } catch (e) {
@@ -74,22 +92,40 @@ export async function getPageViews(days = 365): Promise<PageViews> {
   }
 }
 
-// 記事のWPリンク(と投稿ID)からPVを引く。複数の候補パスで照合する。
-export function lookupViews(pv: PageViews, link: string, postId: number): number | null {
-  if (!pv.configured || pv.byPath.size === 0) return null;
-  const candidates = new Set<string>();
+function candidatePaths(link: string, postId: number): string[] {
+  const set = new Set<string>();
   if (link) {
-    candidates.add(normalizePath(link));
+    set.add(normalizePath(link));
     try {
       const u = new URL(link);
-      candidates.add(normalizePath(u.pathname));        // クエリ無し
-      candidates.add(normalizePath(u.pathname + u.search));
+      set.add(normalizePath(u.pathname));
+      set.add(normalizePath(u.pathname + u.search));
     } catch { /* ignore */ }
   }
-  // パーマリンク未設定サイト向け: /?p=ID
-  candidates.add(normalizePath(`/?p=${postId}`));
+  set.add(normalizePath(`/?p=${postId}`));
+  return [...set];
+}
 
-  for (const c of candidates) {
+export function lookupMetric(pm: PageMetrics, link: string, postId: number): PageMetric | null {
+  if (!pm.configured || pm.byPath.size === 0) return null;
+  for (const c of candidatePaths(link, postId)) {
+    const v = pm.byPath.get(c);
+    if (v != null) return v;
+  }
+  return null;
+}
+
+// ── 後方互換: PVのみ版（リライト画面で使用） ──────────────────
+export async function getPageViews(days = 365): Promise<PageViews> {
+  const pm = await getPageMetrics(days);
+  const byPath = new Map<string, number>();
+  for (const [k, v] of pm.byPath) byPath.set(k, v.views);
+  return { byPath, configured: pm.configured, error: pm.error };
+}
+
+export function lookupViews(pv: PageViews, link: string, postId: number): number | null {
+  if (!pv.configured || pv.byPath.size === 0) return null;
+  for (const c of candidatePaths(link, postId)) {
     const v = pv.byPath.get(c);
     if (v != null) return v;
   }
