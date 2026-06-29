@@ -120,7 +120,10 @@ export function Sidebar({ bypass }: Props) {
   const DesktopSidebar = () => (
     <aside className="sidebar-desktop" style={{
       width: 220, background: "#161d2b", display: "flex",
-      flexDirection: "column", minHeight: "100dvh", flexShrink: 0,
+      flexDirection: "column", flexShrink: 0,
+      // スクロールしても画面左に固定する
+      position: "sticky", top: 0, alignSelf: "flex-start",
+      height: "100dvh", overflowY: "auto",
     }}>
       <Logo />
       <NavLinks />
