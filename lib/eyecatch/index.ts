@@ -39,16 +39,19 @@ function buildTextPath(
   const { jp, lat } = getFonts();
   const s = fontSize / REF;
   let penRef = 0;
-  const ds: string[] = [];
+  const parts: string[] = [];
   for (const ch of [...text]) {
     const f = jp.charToGlyph(ch).index ? jp : (lat.charToGlyph(ch).index ? lat : jp);
     const glyph = f.charToGlyph(ch);
-    // ベースライン y=0 で REF サイズのパスを生成
-    ds.push(glyph.getPath(penRef, 0, REF).toPathData(2));
+    // 各グリフは原点(x=0)で描き、translate で配置する。
+    // getPath に大きな x を渡すとパス座標が巨大になり、resvg が特定グリフの
+    // 密な数値列を誤読して欠落させるバグがあるため、原点描画で回避する。
+    const d = glyph.getPath(0, 0, REF).toPathData(2);
+    if (d) parts.push(`<g transform="translate(${penRef.toFixed(2)},0)"><path d="${d}"/></g>`);
     penRef += (glyph.advanceWidth ?? f.unitsPerEm) * (REF / f.unitsPerEm);
   }
   const op = opacity != null ? ` opacity="${opacity}"` : "";
-  const svg = `<g transform="translate(${xLeft},${yBaseline}) scale(${s.toFixed(4)})"><path d="${ds.join(" ")}" fill="${fill}"${op}/></g>`;
+  const svg = `<g transform="translate(${xLeft},${yBaseline}) scale(${s.toFixed(4)})" fill="${fill}"${op}>${parts.join("")}</g>`;
   return { svg, width: penRef * s };
 }
 
@@ -110,6 +113,44 @@ const DEFAULT_THEME: Theme = {
   accent: "#8ab4cc", tileBase: "#2c5070", bubble: "#0e1a24",
   tag: "kawacoin的まとめ",
 };
+
+// ─── Unsplash 背景写真 ────────────────────────────────────────────
+// テンプレ種別ごとの検索キーワード（記事内容と合う写真を狙う）
+const UNSPLASH_KEYWORDS: Record<string, string> = {
+  T1: "investing personal finance",
+  T2: "finance comparison analysis",
+  T3: "investment guide success",
+  T4: "stock market chart trading",
+  T5: "financial risk warning money",
+  T6: "financial system documents",
+};
+const DEFAULT_UNSPLASH_KEYWORD = "finance money investment";
+
+// Unsplash からランダム写真を取得し base64 data URI で返す。
+// UNSPLASH_ACCESS_KEY 未設定・失敗時は null（グラデーション背景にフォールバック）。
+async function fetchUnsplashPhoto(keyword: string): Promise<string | null> {
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!key) return null;
+  try {
+    const url = `https://api.unsplash.com/photos/random?query=${encodeURIComponent(keyword)}&orientation=landscape&content_filter=high`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Client-ID ${key}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { urls?: { regular?: string } };
+    const photoUrl = data?.urls?.regular;
+    if (!photoUrl) return null;
+
+    const imgRes = await fetch(photoUrl, { signal: AbortSignal.timeout(10000) });
+    if (!imgRes.ok) return null;
+    const buf = await imgRes.arrayBuffer();
+    const mime = imgRes.headers.get("content-type") ?? "image/jpeg";
+    return `data:${mime};base64,${Buffer.from(buf).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
 
 // ─── 文字幅推定 ───────────────────────────────────────────────────
 function estimateWidth(text: string, fontSize: number): number {
@@ -212,11 +253,12 @@ function tileColor(base: string, idx: number, total: number): string {
 export function generateEyecatchSvg(
   title: string,
   template: string | null | undefined,
-  options: { keyword?: string; subtitle?: string; description?: string } = {}
+  options: { keyword?: string; subtitle?: string; description?: string; photoBg?: string | null } = {}
 ): string {
   const theme: Theme = (template ? THEMES[template] : undefined) ?? DEFAULT_THEME;
   const subtitle    = options.subtitle    ?? theme.tag;
   const description = options.description ?? "";
+  const photoBg     = options.photoBg ?? null;
   const kwTiles     = splitKeyword(options.keyword ?? "");
   const layout      = layoutTitle(title);
 
@@ -264,34 +306,51 @@ export function generateEyecatchSvg(
   ${centeredText(seg, tx + TW/2, ty + TH/2 + tfs*0.38, tfs, "white")}`;
   }).join("");
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  // ─ 背景レイヤー: 写真があれば写真+スクリム、なければグラデーション ─
+  const bgLayer = photoBg ? `
   <defs>
-    <!-- 3段グラデーション -->
+    <!-- 写真を暗く覆って文字を読みやすくするスクリム -->
+    <linearGradient id="scrim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="${theme.gradC}" stop-opacity="0.80"/>
+      <stop offset="50%"  stop-color="${theme.gradC}" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="${theme.gradC}" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+  <image href="${photoBg}" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1200" height="630" fill="url(#scrim)"/>` : `
+  <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%"   stop-color="${theme.gradA}"/>
       <stop offset="48%"  stop-color="${theme.gradB}"/>
       <stop offset="100%" stop-color="${theme.gradC}"/>
     </linearGradient>
-    <!-- 放射状ソフトグロー -->
     <radialGradient id="glow" cx="38%" cy="42%" r="55%">
       <stop offset="0%"   stop-color="white" stop-opacity="0.09"/>
       <stop offset="100%" stop-color="white" stop-opacity="0"/>
     </radialGradient>
-    <!-- ドットパターン(テクスチャ) -->
     <pattern id="dots" x="0" y="0" width="36" height="36" patternUnits="userSpaceOnUse">
       <circle cx="18" cy="18" r="1.2" fill="white" opacity="0.07"/>
     </pattern>
   </defs>
-
-  <!-- 背景 -->
   <rect width="1200" height="630" fill="url(#bg)"/>
   <rect width="1200" height="630" fill="url(#dots)"/>
   <ellipse cx="420" cy="280" rx="520" ry="280" fill="url(#glow)"/>
-
-  <!-- 装飾: 大円 -->
   <circle cx="1080" cy="80"  r="220" fill="white" opacity="0.04"/>
   <circle cx="130"  cy="560" r="170" fill="white" opacity="0.04"/>
-  <circle cx="600"  cy="315" r="340" fill="white" opacity="0.025"/>
+  <circle cx="600"  cy="315" r="340" fill="white" opacity="0.025"/>`;
+
+  // ─ タイトル背景パネル (写真時のみ・可読性確保) ──────────────────
+  const panelPadY = 26;
+  const titlePanelSvg = photoBg ? `
+  <rect x="48" y="${Math.round(titleTop - panelPadY)}" width="1104" height="${Math.round(titleBlockH + panelPadY * 2)}" rx="14" fill="black" opacity="0.34"/>` : "";
+
+  // ─ Unsplash クレジット (写真時のみ) ───────────────────────────
+  const creditSvg = photoBg
+    ? `<text x="1188" y="623" font-family="sans-serif" font-size="11" fill="white" opacity="0.5" text-anchor="end">Photo: Unsplash</text>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  ${bgLayer}
 
   <!-- 二重枠 (白) -->
   <rect x="18" y="18" width="1164" height="594" rx="22" fill="none" stroke="white" stroke-width="2.5" opacity="0.75"/>
@@ -299,11 +358,12 @@ export function generateEyecatchSvg(
 
   ${bubbleSvg}
   ${tilesSvg}
+  ${titlePanelSvg}
 
   <!-- タイトル(シャドウ) -->
   ${layout.lines.map((line, i) => {
     const y = Math.round(titleTop + i * layout.lineH + layout.fontSize * 0.82);
-    return centeredText(line, 602, y + 2, layout.fontSize, "black", 0.25);
+    return centeredText(line, 602, y + 2, layout.fontSize, "black", photoBg ? 0.55 : 0.25);
   }).join("\n  ")}
 
   <!-- タイトル本体 -->
@@ -313,7 +373,8 @@ export function generateEyecatchSvg(
   ${descSvg}
 
   <!-- サイトラベル -->
-  ${centeredText("kawacoins.com", 600, 606, 18, "white", 0.45)}
+  ${centeredText("kawacoins.com", 600, 606, 18, "white", 0.5)}
+  ${creditSvg}
 </svg>`;
 }
 
@@ -326,7 +387,11 @@ export async function generateEyecatchPng(
   template: string | null | undefined,
   options: { keyword?: string; subtitle?: string; description?: string } = {}
 ): Promise<Buffer> {
-  const svg = generateEyecatchSvg(title, template, options);
+  // 背景写真を取得（UNSPLASH_ACCESS_KEY 未設定/失敗時は null → グラデーション）
+  const unsplashKeyword = (template ? UNSPLASH_KEYWORDS[template] : null) ?? DEFAULT_UNSPLASH_KEYWORD;
+  const photoBg = await fetchUnsplashPhoto(unsplashKeyword);
+
+  const svg = generateEyecatchSvg(title, template, { ...options, photoBg });
   const { Resvg } = await import("@resvg/resvg-js");
   return Buffer.from(new Resvg(svg).render().asPng());
 }
