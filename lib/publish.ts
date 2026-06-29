@@ -16,6 +16,7 @@ import { isJudgmentComplete } from "@/lib/gate";
 import { replaceAffiliatePlaceholders } from "@/lib/affiliate";
 import { getTemplate } from "@/lib/templates";
 import { applyVisuals, renderFaq, Visual } from "@/lib/visuals";
+import { trackUsage } from "@/lib/track-usage";
 
 export interface PublishResult {
   wpPostId?: number;
@@ -105,6 +106,63 @@ function experienceToText(choice: string | null, note: string | null, label: str
   return `（${label}）`;
 }
 
+// 体験コメント(生の入力)を、記事に馴染む自然な文章へAIで書き換える。
+// 複数スロットを1回のClaude呼び出しでまとめて整える。
+// ANTHROPIC_API_KEY 未設定・失敗時は experienceToText の素の値にフォールバック。
+async function polishExperiences(
+  exps: { label: string; choice: string | null; note: string | null }[],
+  title: string,
+): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  // まず素の値で埋めておく（フォールバック兼デフォルト）
+  for (const e of exps) result[e.label] = experienceToText(e.choice, e.note, e.label);
+
+  const filled = exps.filter(e => e.note?.trim());
+  if (filled.length === 0 || !process.env.ANTHROPIC_API_KEY) return result;
+
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const items = filled.map((e, i) =>
+      `${i + 1}. セクション「${e.label}」${e.choice ? `（選択: ${e.choice}）` : ""}\n   メモ: ${e.note!.trim()}`
+    ).join("\n");
+
+    const prompt = `あなたは投資ブログの編集者です。筆者が走り書きした体験メモを、記事にそのまま載せられる自然な文章へ整えてください。
+
+記事タイトル: ${title}
+
+【体験メモ（番号ごとに整える）】
+${items}
+
+【ルール】
+- 一人称の語り口（です・ます調、口語寄り）で、読者に語りかけるトーン。
+- メモの意図・事実は変えない。新しい事実や数値を創作しない。誇張・断定的助言にしない。
+- 1項目あたり1〜3文。走り書きの言い切り（例「安いので！」）は、理由や文脈を補って自然な一文にする。
+- 各項目を JSON で返す: [{ "n": 1, "text": "整えた文章" }, ...]。JSONのみ返す。`;
+
+    const msg = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1200,
+      messages: [{ role: "user", content: prompt }],
+    });
+    void trackUsage({ operation: "polish_experience", model: "claude-sonnet-4-6", inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens });
+
+    const text = msg.content.filter(b => b.type === "text").map(b => (b as { text: string }).text).join("").trim();
+    const json = text.match(/\[[\s\S]*\]/);
+    if (json) {
+      const arr = JSON.parse(json[0]) as { n: number; text: string }[];
+      for (const it of arr) {
+        const e = filled[it.n - 1];
+        if (e && it.text?.trim()) result[e.label] = it.text.trim();
+      }
+    }
+  } catch (err) {
+    console.warn("[polish] skipped:", err instanceof Error ? err.message : err);
+  }
+  return result;
+}
+
 export class PublishError extends Error {
   constructor(public readonly userMessage: string, public readonly statusCode: number) {
     super(userMessage);
@@ -141,10 +199,14 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
         throw new PublishError(`体験スロットが未充足です: ${missing.join(", ")}`, 422);
       }
 
-      // ② [EXPERIENCE:*] 置換（選択肢ラベルが生で露出しないよう自然語に変換）
+      // ② [EXPERIENCE:*] 置換（生の入力をAIで自然な文章に書き換えてから差し込む）
       let bodyMd = article.bodyMd;
+      const polished = await polishExperiences(
+        exps.map(e => ({ label: e.label, choice: e.choice, note: e.note })),
+        article.title,
+      );
       for (const exp of exps) {
-        const replacement = experienceToText(exp.choice, exp.note, exp.label);
+        const replacement = polished[exp.label] ?? experienceToText(exp.choice, exp.note, exp.label);
         const re = new RegExp(`\\[EXPERIENCE:${exp.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "g");
         bodyMd = bodyMd.replace(re, replacement);
       }
