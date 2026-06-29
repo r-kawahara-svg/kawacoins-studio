@@ -7,9 +7,10 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+// 落ち着いたトーンに統一（彩度控えめ）
 const TEMPLATE_COLORS: Record<string, string> = {
-  T1: "#1a9a82", T2: "#2264cc", T3: "#207840",
-  T4: "#3d4fb8", T5: "#b83030", T6: "#2b5c8c",
+  T1: "#5f8a8f", T2: "#5b7a9c", T3: "#5f8a6e",
+  T4: "#6b6f9c", T5: "#a8736b", T6: "#5b7a9c",
 };
 
 export default async function PublishedPage() {

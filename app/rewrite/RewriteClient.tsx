@@ -96,7 +96,7 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {PRESETS.map((p) => (
             <button key={p.label} onClick={() => setDirection(p.text)} disabled={running} style={{
-              background: "#f0fdf4", color: "#065f46", border: "1px solid #0f766b",
+              background: "#f2f5f4", color: "#3f5a55", border: "1px solid #c3d2ce",
               borderRadius: 8, padding: "6px 12px", fontSize: 12.5, fontWeight: 600,
               cursor: running ? "not-allowed" : "pointer",
             }}>{p.label}</button>
