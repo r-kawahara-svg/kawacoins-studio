@@ -32,6 +32,20 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<Record<number, RunResult>>({});
   const [current, setCurrent] = useState<number | null>(null);
+  const [eyecatchRun, setEyecatchRun] = useState<Record<number, "running" | "done" | "error">>({});
+
+  async function regenEyecatch(id: number) {
+    setEyecatchRun((r) => ({ ...r, [id]: "running" }));
+    try {
+      const res = await fetch(`/api/wp-eyecatch`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: id }),
+      });
+      setEyecatchRun((r) => ({ ...r, [id]: res.ok ? "done" : "error" }));
+    } catch {
+      setEyecatchRun((r) => ({ ...r, [id]: "error" }));
+    }
+  }
 
   const PRESETS: { label: string; text: string }[] = [
     {
@@ -163,6 +177,20 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
               <span style={{ fontSize: 11.5, fontFamily: "monospace", flexShrink: 0, minWidth: 70, textAlign: "right", color: (viewsMap[p.id] ?? 0) > 0 ? "#0f766b" : "#9ba8b5" }} title="直近365日のPV">
                 {viewsMap[p.id] == null ? "—" : `${viewsMap[p.id]!.toLocaleString()} PV`}
               </span>
+              {/* アイキャッチ再生成（チェックボックスを切り替えないよう伝播停止） */}
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); regenEyecatch(p.id); }}
+                disabled={eyecatchRun[p.id] === "running"}
+                title="アイキャッチ画像を再生成"
+                style={{
+                  flexShrink: 0, fontSize: 11, fontWeight: 600,
+                  color: eyecatchRun[p.id] === "done" ? "#0f766b" : "#5b6470",
+                  background: "#f2f5f4", border: "1px solid #d6dee0",
+                  borderRadius: 7, padding: "5px 9px", whiteSpace: "nowrap", minHeight: 32,
+                }}
+              >
+                {eyecatchRun[p.id] === "running" ? "生成中…" : eyecatchRun[p.id] === "done" ? "✓ 画像更新" : eyecatchRun[p.id] === "error" ? "画像失敗" : "🖼 アイキャッチ"}
+              </button>
               {p.date && <span style={{ fontSize: 11, color: "#9ba8b5", fontFamily: "monospace", flexShrink: 0 }}>{p.date.slice(0, 10)}</span>}
               {st && (
                 <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, textAlign: "right", color: st.state === "done" ? "#0f766b" : st.state === "error" ? "#c4453a" : "#b07d2e" }}>

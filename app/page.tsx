@@ -1,398 +1,129 @@
 import { db } from "@/db";
 import { topics, articles } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, inArray } from "drizzle-orm";
 import Link from "next/link";
-import { DeleteButton } from "@/app/articles/[id]/DeleteButton";
+import { listWpPosts } from "@/lib/wp";
+import { getPageMetrics, lookupMetric } from "@/lib/analytics";
+import { gradeOf, GRADE_STYLE, GRADE_FALLBACK } from "@/lib/grade";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  // Real DB counts
-  const [topicCount] = await db.select({ count: count() }).from(topics);
-  const [gateCount] = await db
-    .select({ count: count() })
-    .from(articles)
-    .where(eq(articles.status, "gate"));
-  const [publishedCount] = await db
-    .select({ count: count() })
-    .from(articles)
-    .where(eq(articles.status, "published"));
+  const [topicCount] = await db.select({ count: count() }).from(topics).where(eq(topics.status, "new"));
+  const [publishedCount] = await db.select({ count: count() }).from(articles).where(eq(articles.status, "published"));
+  const [reviewCount] = await db.select({ count: count() }).from(articles).where(inArray(articles.status, ["review", "gate", "approved"]));
 
-  // Gate articles list (status = 'gate', most recent 10)
-  const gateArticles = await db
-    .select({ id: articles.id, title: articles.title, createdAt: articles.createdAt, wpPostId: articles.wpPostId })
-    .from(articles)
-    .where(eq(articles.status, "gate"))
-    .limit(10);
+  // WP + GA から PV を集計
+  let posts: Awaited<ReturnType<typeof listWpPosts>> = [];
+  try { posts = await listWpPosts(); } catch { /* WP未設定など */ }
+  posts = posts.filter(p => p.status !== "future");
+  const pm = await getPageMetrics(365);
 
-  // Pipeline strip counts
-  const [draftCount] = await db
-    .select({ count: count() })
-    .from(articles)
-    .where(eq(articles.status, "draft"));
-  const [scheduledCount] = await db
-    .select({ count: count() })
-    .from(articles)
-    .where(eq(articles.status, "scheduled"));
+  const ranked = posts
+    .map(p => ({ ...p, metric: lookupMetric(pm, p.link, p.id) }))
+    .sort((a, b) => (b.metric?.views ?? -1) - (a.metric?.views ?? -1));
+
+  const totalViews = ranked.reduce((s, r) => s + (r.metric?.views ?? 0), 0);
+  const totalUsers = ranked.reduce((s, r) => s + (r.metric?.users ?? 0), 0);
+  const top = ranked.slice(0, 5);
+  const maxViews = Math.max(1, ...top.map(r => r.metric?.views ?? 0));
+
+  const metrics = [
+    { label: "合計PV（365日）", value: pm.configured ? totalViews.toLocaleString() : "—", accent: true },
+    { label: "合計ユーザー", value: pm.configured ? totalUsers.toLocaleString() : "—" },
+    { label: "公開記事", value: publishedCount.count.toLocaleString() },
+    { label: "ネタ候補", value: topicCount.count.toLocaleString() },
+  ];
+
+  const card: React.CSSProperties = { background: "#fff", border: "1px solid #e3e6ea", borderRadius: 14 };
 
   return (
     <div style={{ padding: "20px 16px 60px", maxWidth: 1000, margin: "0 auto" }}>
-      <div
-        style={{
-          fontSize: 10.5,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "#697587",
-          fontWeight: 600,
-          fontFamily: "monospace",
-          marginBottom: 20,
-        }}
-      >
+      <div style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9aa3af", fontWeight: 600, fontFamily: "monospace", marginBottom: 12 }}>
         ダッシュボード
       </div>
+      <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1f2937", margin: "0 0 20px" }}>
+        記事スタジオの状況
+      </h1>
 
-      {/* KPI cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3,1fr)",
-          gap: 18,
-          marginBottom: 24,
-        }}
-      >
-        {[
-          {
-            label: "ネタ候補",
-            value: topicCount.count,
-            unit: "件",
-            href: "/topics",
-            color: "#161d2b",
-          },
-          {
-            label: "判断待ち",
-            value: gateCount.count,
-            unit: "件",
-            color: "#b07d2e",
-          },
-          {
-            label: "公開済み",
-            value: publishedCount.count,
-            unit: "件",
-            href: "/published",
-            color: "#0f766b",
-          },
-        ].map((k) => (
-          <div
-            key={k.label}
-            style={{
-              background: "#fff",
-              border: "1px solid #dce1e8",
-              borderRadius: 14,
-              padding: "18px 20px",
-              boxShadow: "0 1px 2px rgba(22,29,43,.04)",
-            }}
-          >
-            <div style={{ fontSize: 12, color: "#697587" }}>{k.label}</div>
-            <div
-              style={{
-                fontFamily: "monospace",
-                fontWeight: 800,
-                fontSize: 30,
-                marginTop: 8,
-                color: k.color,
-              }}
-            >
-              {k.value}
-              <span
-                style={{
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: "#697587",
-                  marginLeft: 2,
-                }}
-              >
-                {k.unit}
-              </span>
+      {/* メトリクスカード（レスポンシブ） */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>
+        {metrics.map((m) => (
+          <div key={m.label} style={{ ...card, padding: "16px 18px" }}>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>{m.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, fontFamily: "monospace", marginTop: 6, color: m.accent ? "#0f766b" : "#1f2937" }}>
+              {m.value}
             </div>
-            {k.href && (
-              <Link
-                href={k.href}
-                style={{
-                  fontSize: 12,
-                  color: "#0f766b",
-                  marginTop: 8,
-                  display: "block",
-                }}
-              >
-                一覧を見る →
-              </Link>
-            )}
           </div>
         ))}
       </div>
 
-      {/* Pipeline strip */}
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #dce1e8",
-          borderRadius: 14,
-          padding: "16px 20px",
-          marginBottom: 24,
-          display: "flex",
-          gap: 0,
-          alignItems: "stretch",
-          boxShadow: "0 1px 2px rgba(22,29,43,.04)",
-        }}
-      >
-        {[
-          {
-            label: "ネタキュー",
-            count: topicCount.count,
-            color: "#697587",
-            href: "/topics",
-          },
-          { arrow: true },
-          {
-            label: "下書き生成",
-            count: draftCount.count,
-            color: "#2b5e8c",
-          },
-          { arrow: true },
-          {
-            label: "判断ゲート",
-            count: gateCount.count,
-            color: "#b07d2e",
-          },
-          { arrow: true },
-          {
-            label: "スケジュール済み",
-            count: scheduledCount.count,
-            color: "#7a5ea8",
-          },
-          { arrow: true },
-          {
-            label: "公開済み",
-            count: publishedCount.count,
-            color: "#0f766b",
-          },
-        ].map((step, i) => {
-          if ("arrow" in step) {
-            return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "0 8px",
-                  color: "#dce1e8",
-                  fontSize: 18,
-                }}
-              >
-                →
-              </div>
-            );
-          }
+      {/* やること */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 24 }}>
+        <Link href="/topics" style={{ ...card, padding: "16px 18px", textDecoration: "none", display: "block" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>新しい記事を作る</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>ネタ生成 → 公開まで</div>
+            </div>
+            <span style={{ fontSize: 13, color: "#0f766b", fontWeight: 700 }}>ネタ候補 {topicCount.count} →</span>
+          </div>
+        </Link>
+        <Link href="/rewrite" style={{ ...card, padding: "16px 18px", textDecoration: "none", display: "block" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>公開記事をリライト</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>更新・見直し・アイキャッチ再生成</div>
+            </div>
+            <span style={{ fontSize: 13, color: "#0f766b", fontWeight: 700 }}>→</span>
+          </div>
+        </Link>
+      </div>
+
+      {/* 人気記事 TOP5 */}
+      <div style={{ ...card, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid #eef0f3" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>よく読まれている記事</span>
+          <Link href="/analytics" style={{ marginLeft: "auto", fontSize: 12, color: "#0f766b", fontWeight: 600, textDecoration: "none" }}>
+            アクセス解析へ →
+          </Link>
+        </div>
+
+        {!pm.configured && (
+          <div style={{ padding: "20px 18px", fontSize: 12.5, color: "#8a6d2f", background: "#fbf6e9" }}>
+            PVを表示するにはGoogle Analytics（GA4）の連携設定が必要です。
+          </div>
+        )}
+
+        {pm.configured && top.length === 0 && (
+          <div style={{ padding: "24px 18px", textAlign: "center", color: "#6b7280", fontSize: 13 }}>まだ記事がありません</div>
+        )}
+
+        {top.map((r, i) => {
+          const v = r.metric?.views ?? 0;
+          const barPct = Math.round((v / maxViews) * 100);
+          const grade = gradeOf(r.metric);
+          const gs = GRADE_STYLE[grade] ?? GRADE_FALLBACK;
           return (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                textAlign: "center",
-                padding: "8px 4px",
-                borderRadius: 8,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "monospace",
-                  fontWeight: 800,
-                  fontSize: 22,
-                  color: step.color,
-                }}
-              >
-                {step.count}
+            <div key={r.id} style={{ padding: "12px 18px", borderBottom: "1px solid #eef0f3" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#aab0b8", fontFamily: "monospace", minWidth: 18 }}>{i + 1}</span>
+                <span style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, background: gs.bg, color: gs.text, fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace" }}>
+                  {grade || "—"}
+                </span>
+                <a href={r.link} target="_blank" rel="noopener noreferrer" style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "#1f2937", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</a>
+                <span style={{ fontSize: 12.5, fontWeight: 700, fontFamily: "monospace", flexShrink: 0, color: r.metric == null ? "#aab0b8" : "#374151" }}>
+                  {r.metric == null ? "—" : `${v.toLocaleString()} PV`}
+                </span>
               </div>
-              <div style={{ fontSize: 10.5, color: "#697587", marginTop: 2 }}>
-                {step.href ? (
-                  <Link href={step.href} style={{ color: "#697587" }}>
-                    {step.label}
-                  </Link>
-                ) : (
-                  step.label
-                )}
-              </div>
+              {r.metric != null && (
+                <div style={{ height: 4, background: "#eef0f3", borderRadius: 2, marginTop: 6, marginLeft: 54, overflow: "hidden" }}>
+                  <div style={{ width: `${barPct}%`, height: "100%", background: gs.bar }} />
+                </div>
+              )}
             </div>
           );
         })}
-      </div>
-
-      {/* Gate article list */}
-      {gateArticles.length > 0 && (
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #dce1e8",
-            borderRadius: 14,
-            marginBottom: 24,
-            boxShadow: "0 1px 2px rgba(22,29,43,.04)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "14px 20px",
-              borderBottom: "1px solid #dce1e8",
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontWeight: 700,
-                fontSize: 13,
-              }}
-            >
-              判断待ち記事
-            </span>
-            <span
-              style={{
-                marginLeft: "auto",
-                background: "#fef3c7",
-                color: "#92400e",
-                borderRadius: 6,
-                padding: "2px 8px",
-                fontSize: 11,
-                fontWeight: 700,
-                fontFamily: "monospace",
-              }}
-            >
-              {gateArticles.length}件
-            </span>
-          </div>
-          {gateArticles.map((a) => (
-            <div
-              key={a.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "12px 20px",
-                borderBottom: "1px solid #dce1e8",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: "#b07d2e",
-                  flexShrink: 0,
-                }}
-              />
-              <div style={{ flex: 1, fontWeight: 500, fontSize: 13, color: "#161d2b" }}>
-                {a.title}
-              </div>
-              {a.createdAt && (
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#697587",
-                    fontFamily: "monospace",
-                    flexShrink: 0,
-                  }}
-                >
-                  {new Date(a.createdAt).toLocaleDateString("ja-JP")}
-                </div>
-              )}
-              <Link
-                href={`/articles/${a.id}`}
-                style={{
-                  fontSize: 12,
-                  color: "#0f766b",
-                  fontWeight: 600,
-                  flexShrink: 0,
-                }}
-              >
-                判断入力 →
-              </Link>
-              <DeleteButton articleId={a.id} hasWpPost={!!a.wpPostId} compact />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Judgment gate explanation */}
-      <div
-        style={{
-          background: "#161d2b",
-          color: "#dfe5ee",
-          borderRadius: 14,
-          padding: "20px 22px",
-          display: "flex",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 10,
-            background: "rgba(15,118,107,.25)",
-            color: "#5fd3c5",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            fontSize: 20,
-          }}
-        >
-          🛡
-        </div>
-        <div>
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: 14,
-              color: "#fff",
-              marginBottom: 5,
-            }}
-          >
-            なぜ「判断ゲート」があるのか
-          </div>
-          <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "#a9b4c4" }}>
-            Googleは AI 利用そのものは罰しないが、
-            <strong style={{ color: "#fff" }}>
-              一次体験と判断の乗らない量産
-            </strong>
-            を弾く。あなたの実トレード視点を1記事ずつ注入することが、スロップとの唯一の差になる。
-          </p>
-        </div>
-      </div>
-
-      {/* Revenue Phase 2 placeholder */}
-      <div
-        style={{
-          background: "#fff",
-          border: "1.5px dashed #dce1e8",
-          borderRadius: 14,
-          padding: "24px 24px",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "monospace",
-            fontWeight: 700,
-            fontSize: 13,
-            color: "#697587",
-            marginBottom: 6,
-          }}
-        >
-          収益ダッシュボード（Phase 2）
-        </div>
-        <div style={{ fontSize: 12, color: "#a9b4c4" }}>
-          AdSense・アフィリエイト収益の集計・グラフはPhase 2で実装予定です
-        </div>
       </div>
     </div>
   );

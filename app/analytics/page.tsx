@@ -1,36 +1,12 @@
 import { listWpPosts, type WpPostSummary } from "@/lib/wp";
 import { getPageMetrics, lookupMetric, type PageMetric } from "@/lib/analytics";
+import { gradeOf, GRADE_STYLE, GRADE_FALLBACK } from "@/lib/grade";
 
 export const dynamic = "force-dynamic";
 
 const STATUS_LABEL: Record<string, string> = {
   publish: "公開", draft: "下書き", pending: "承認待ち", private: "非公開",
 };
-
-// 落ち着いた評価カラー（彩度を抑えた統一トーン）
-const GRADE_COLOR: Record<string, string> = {
-  A: "#3f7d6e", B: "#5f8a8f", C: "#8a8f98", D: "#a98a63", E: "#a8736b",
-};
-
-// ─── 絶対評価ロジック（世の中の目安に基づく固定基準）──────────────
-// 1記事あたり「直近365日の累計PV」を基準にベース点、平均滞在時間で補正。
-const PV_BANDS = [
-  { min: 10000, pt: 5, label: "10,000PV以上" },
-  { min: 3000, pt: 4, label: "3,000〜9,999PV" },
-  { min: 1000, pt: 3, label: "1,000〜2,999PV" },
-  { min: 300, pt: 2, label: "300〜999PV" },
-  { min: 0, pt: 1, label: "300PV未満" },
-];
-const SCORE_TO_GRADE = ["", "E", "D", "C", "B", "A"]; // index 1..5
-
-function gradeOf(m: PageMetric | null): string {
-  if (!m) return "";
-  const base = PV_BANDS.find(b => m.views >= b.min)?.pt ?? 1;
-  // 平均滞在時間で ±1 補正（読まれている=加点 / すぐ離脱=減点）
-  const mod = m.engagementSec >= 60 ? 1 : m.engagementSec < 20 ? -1 : 0;
-  const score = Math.max(1, Math.min(5, base + mod));
-  return SCORE_TO_GRADE[score];
-}
 
 interface Row extends WpPostSummary { metric: PageMetric | null; grade: string; }
 
@@ -138,14 +114,14 @@ export default async function AnalyticsPage() {
         {rows.map((r, i) => {
           const v = r.metric?.views ?? 0;
           const barPct = Math.round((v / maxViews) * 100);
-          const gradeColor = GRADE_COLOR[r.grade] ?? "#aab0b8";
+          const gs = GRADE_STYLE[r.grade] ?? GRADE_FALLBACK;
           return (
             <div key={r.id} style={{ padding: "12px 16px", borderBottom: "1px solid #eef0f3" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#aab0b8", fontFamily: "monospace", minWidth: 22, textAlign: "right" }}>{i + 1}</span>
                 <span style={{
                   width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                  background: gradeColor, color: "#fff", fontWeight: 700, fontSize: 15,
+                  background: gs.bg, color: gs.text, fontWeight: 800, fontSize: 15,
                   display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace",
                 }}>{r.grade || "—"}</span>
                 <span style={{ background: "#eef0f3", color: "#5b6470", borderRadius: 5, padding: "2px 7px", fontSize: 10, fontWeight: 700, fontFamily: "monospace", flexShrink: 0 }}>
@@ -162,7 +138,7 @@ export default async function AnalyticsPage() {
               </div>
               {r.metric != null && (
                 <div style={{ height: 4, background: "#eef0f3", borderRadius: 2, marginTop: 6, marginLeft: 64, overflow: "hidden" }}>
-                  <div style={{ width: `${barPct}%`, height: "100%", background: gradeColor }} />
+                  <div style={{ width: `${barPct}%`, height: "100%", background: gs.bar }} />
                 </div>
               )}
             </div>

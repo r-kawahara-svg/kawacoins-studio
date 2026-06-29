@@ -21,14 +21,27 @@
 html { -webkit-text-size-adjust: 100%; }
 
 body {
-  background: #e9ecf0;
-  color: #161d2b;
+  background: #f5f7f9;
+  color: #1f2937;
   font-family: "Inter", "Noto Sans JP", sans-serif;
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
   /* 横スクロール撲滅 */
   overflow-x: hidden;
   max-width: 100vw;
+}
+
+/* ─── ボタン共通: 押し心地（押下でわずかに沈む）──────────────── */
+button, [role="button"] {
+  cursor: pointer;
+  transition: transform .08s ease, background .15s ease, box-shadow .12s ease, opacity .15s ease;
+}
+button:active:not(:disabled), [role="button"]:active {
+  transform: scale(0.97);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 /* ─── アプリシェル ─────────────────────────────────────── */
@@ -73,8 +86,9 @@ body {
     left: 0;
     right: 0;
     z-index: 30;
-    background: #161d2b;
-    border-top: 1px solid #232f42;
+    background: #ffffff;
+    border-top: 1px solid #e3e6ea;
+    box-shadow: 0 -1px 8px rgba(31,41,55,.06);
     /* iOS セーフエリア対応 */
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
