@@ -227,17 +227,34 @@ JSON のみ返してください。`;
     }
   }
 
-  // 既存の experiences を削除
-  await db.delete(experiences).where(eq(experiences.articleId, articleId));
+  const templateChanged = targetTemplate !== article.template;
 
-  // 新テンプレートに合わせて experiences を再作成
-  if (tmpl && tmpl.experienceSlots.length > 0) {
-    for (const label of tmpl.experienceSlots) {
-      await db.insert(experiences).values({ articleId, label, completed: false });
+  // テンプレ変更時のみ experiences を作り直す（公開中の在庫体験を壊さない）
+  if (templateChanged) {
+    await db.delete(experiences).where(eq(experiences.articleId, articleId));
+    if (tmpl && tmpl.experienceSlots.length > 0) {
+      for (const label of tmpl.experienceSlots) {
+        await db.insert(experiences).values({ articleId, label, completed: false });
+      }
     }
   }
 
-  // 記事を更新（ステータスを review に戻す）
+  // 公開中 & テンプレ変更なし → 公開状態のままWPをその場で更新（再投稿不要）
+  if (article.wpPostId && !templateChanged) {
+    await db.update(articles).set({ bodyMd, visuals, faq }).where(eq(articles.id, articleId));
+    try {
+      const { updatePublishedArticle } = await import("@/lib/publish");
+      await updatePublishedArticle(articleId);
+      return NextResponse.json({ ok: true, updatedLive: true, visualsCount: visuals.length, faqCount: faq.length });
+    } catch (e) {
+      return NextResponse.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        { status: 500 }
+      );
+    }
+  }
+
+  // 未公開 or テンプレ変更 → 下書きとして編集画面(review)に戻す
   await db.update(articles).set({
     bodyMd,
     visuals,
@@ -248,5 +265,5 @@ JSON のみ返してください。`;
     publishedAt: null,
   }).where(eq(articles.id, articleId));
 
-  return NextResponse.json({ ok: true, visualsCount: visuals.length, faqCount: faq.length });
+  return NextResponse.json({ ok: true, updatedLive: false, visualsCount: visuals.length, faqCount: faq.length });
 }

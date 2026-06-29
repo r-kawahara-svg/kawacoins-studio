@@ -9,6 +9,7 @@ import { marked } from "marked";
 import {
   createDraftPost, injectAffiliateRel, uploadMedia, setFeaturedMedia,
   getWpCategories, getWpTags, findOrCreateTag, findOrCreateCategory, pickBestCategory,
+  updatePostContent, updatePostTaxonomy,
 } from "@/lib/wp";
 import { generateEyecatchPng } from "@/lib/eyecatch";
 import { applyJinRFormat } from "@/lib/format";
@@ -169,6 +170,77 @@ export class PublishError extends Error {
   }
 }
 
+type ArticleRow = typeof articles.$inferSelect;
+type ExpRow = { label: string; choice: string | null; note: string | null };
+
+// テンプレ記事の最終HTMLを組み立てる（体験ポリッシュ→図表→アフィリ→FAQ→装飾）。
+// publish と「公開中のまま更新」で共通利用する。
+async function buildTemplateHtml(article: ArticleRow, exps: ExpRow[]): Promise<string> {
+  let bodyMd = article.bodyMd;
+  const polished = await polishExperiences(exps, article.title);
+  for (const exp of exps) {
+    const replacement = polished[exp.label] ?? experienceToText(exp.choice, exp.note, exp.label);
+    const re = new RegExp(`\\[EXPERIENCE:${exp.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "g");
+    bodyMd = bodyMd.replace(re, replacement);
+  }
+  bodyMd = bodyMd.replace(/\[EXPERIENCE:[^\]]+\]/g, "");
+
+  const visualsData = (article.visuals as Visual[]) ?? [];
+  let bodyHtml = await marked(bodyMd);
+  bodyHtml = applyVisuals(bodyHtml, visualsData);
+  bodyHtml = await replaceAffiliatePlaceholders(bodyHtml);
+
+  const faqData = (article.faq as { question: string; answer: string }[]) ?? [];
+  bodyHtml = bodyHtml.replace(/\[FAQ\]/g, renderFaq(faqData));
+  bodyHtml = bodyHtml.replace(/\[FAQ\]/g, "");
+
+  bodyHtml = applyJinRFormat(bodyHtml);
+  return injectAffiliateRel(bodyHtml);
+}
+
+// 公開中のWP記事を、現在のDB内容で「その場で」更新する（再投稿不要）。
+// 本文・カテゴリ・アイキャッチを差し替え、公開状態と wpPostId は維持。
+export async function updatePublishedArticle(articleId: string): Promise<PublishResult> {
+  const [article] = await db.select().from(articles).where(eq(articles.id, articleId));
+  if (!article) throw new PublishError("Article not found", 404);
+  if (!article.wpPostId) throw new PublishError("未公開の記事です（公開中のみ更新可）", 400);
+  if (!process.env.WP_BASE_URL) return { status: "published", skipped: "WP_BASE_URL not set" };
+
+  const topicRow = article.topicId
+    ? await db.select({ keyword: topics.keyword, summary: topics.summary })
+        .from(topics).where(eq(topics.id, article.topicId)).limit(1).then(r => r[0])
+    : undefined;
+
+  const tmpl = getTemplate(article.template);
+  const exps = tmpl && tmpl.experienceSlots.length > 0
+    ? await db.select().from(experiences).where(eq(experiences.articleId, articleId))
+    : [];
+
+  const html = await buildTemplateHtml(article, exps);
+
+  // 本文を差し替え（公開状態は維持される）
+  await updatePostContent(article.wpPostId, { title: article.title, content: html });
+
+  // カテゴリ・タグを再付与
+  const { wpCategories, wpTags } = await resolveWpTaxonomy(article.title, topicRow?.keyword, article.template);
+  await updatePostTaxonomy(article.wpPostId, wpCategories, wpTags);
+
+  // アイキャッチを再生成して差し替え（失敗しても本文更新は維持）
+  try {
+    const png = await generateEyecatchPng(article.title, article.template, {
+      keyword: topicRow?.keyword ?? undefined,
+      description: topicRow?.summary?.slice(0, 50) ?? undefined,
+    });
+    const mediaId = await uploadMedia(png, `eyecatch-${article.id.slice(0, 8)}-${Date.now()}.png`);
+    await setFeaturedMedia(article.wpPostId, mediaId);
+  } catch (e) {
+    console.warn("[eyecatch] update skipped:", e instanceof Error ? e.message : e);
+  }
+
+  await db.update(articles).set({ publishedAt: new Date() }).where(eq(articles.id, articleId));
+  return { wpPostId: article.wpPostId, status: "published" };
+}
+
 export async function publishArticleById(articleId: string): Promise<PublishResult> {
   const [article] = await db.select().from(articles).where(eq(articles.id, articleId));
   if (!article) throw new PublishError("Article not found", 404);
@@ -199,36 +271,8 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
         throw new PublishError(`体験スロットが未充足です: ${missing.join(", ")}`, 422);
       }
 
-      // ② [EXPERIENCE:*] 置換（生の入力をAIで自然な文章に書き換えてから差し込む）
-      let bodyMd = article.bodyMd;
-      const polished = await polishExperiences(
-        exps.map(e => ({ label: e.label, choice: e.choice, note: e.note })),
-        article.title,
-      );
-      for (const exp of exps) {
-        const replacement = polished[exp.label] ?? experienceToText(exp.choice, exp.note, exp.label);
-        const re = new RegExp(`\\[EXPERIENCE:${exp.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "g");
-        bodyMd = bodyMd.replace(re, replacement);
-      }
-      bodyMd = bodyMd.replace(/\[EXPERIENCE:[^\]]+\]/g, "");
-
-      // ③ visuals HTML展開
-      const visualsData = (article.visuals as Visual[]) ?? [];
-      let bodyHtml = await marked(bodyMd);
-      bodyHtml = applyVisuals(bodyHtml, visualsData);
-
-      // ④ AFFILIATE置換
-      bodyHtml = await replaceAffiliatePlaceholders(bodyHtml);
-
-      // ⑤ FAQ展開
-      const faqData = (article.faq as { question: string; answer: string }[]) ?? [];
-      bodyHtml = bodyHtml.replace(/\[FAQ\]/g, renderFaq(faqData));
-      bodyHtml = bodyHtml.replace(/\[FAQ\]/g, "");
-
-      // ⑥ JIN:R装飾変換
-      bodyHtml = applyJinRFormat(bodyHtml);
-
-      const html = injectAffiliateRel(bodyHtml);
+      // ②〜⑥ 本文HTMLを組み立て（体験ポリッシュ・図表・アフィリ・FAQ・装飾）
+      const html = await buildTemplateHtml(article, exps);
 
       if (!process.env.WP_BASE_URL) {
         await db.update(articles).set({ status: "published", publishedAt: new Date() }).where(eq(articles.id, articleId));

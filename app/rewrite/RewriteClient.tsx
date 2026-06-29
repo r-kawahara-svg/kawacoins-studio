@@ -128,7 +128,7 @@ export function RewriteClient({ articles, currentYear }: { articles: ArticleRow[
             ) : `選択した ${selected.size} 件をリライト`}
           </button>
           <span style={{ fontSize: 12, color: "#697587" }}>
-            リライトすると記事は「編集画面」に戻り、WP連携は解除されます（再投稿が必要）
+            公開中の記事はそのまま直接更新されます（再投稿不要）。未公開の記事は「編集画面」に入ります
           </span>
         </div>
       </div>

@@ -124,6 +124,28 @@ export async function setFeaturedMedia(postId: number, mediaId: number): Promise
 interface WpTerm { id: number; name: string; slug: string; count: number; }
 
 /**
+ * 既存WP投稿の本文（とタイトル）を更新する。公開状態は維持される。
+ */
+export async function updatePostContent(
+  postId: number, input: { title?: string; content: string }
+): Promise<void> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+  const res = await fetch(`${base}/?rest_route=/wp/v2/posts/${postId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: auth },
+    body: JSON.stringify({
+      content: input.content,
+      ...(input.title ? { title: input.title } : {}),
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`WordPress updatePostContent error ${res.status}: ${text}`);
+  }
+}
+
+/**
  * 既存WP投稿のカテゴリ・タグを更新する。
  */
 export async function updatePostTaxonomy(
