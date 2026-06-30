@@ -78,6 +78,13 @@ export const apiUsage = pgTable("api_usage", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// アプリ設定（著者プロフィール等のkey-value）
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Phase 2用スキーマ（UIは作らない）
 export const revenues = pgTable("revenues", {
   id: uuid("id").defaultRandom().primaryKey(),
