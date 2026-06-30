@@ -9,6 +9,7 @@ import { publishArticle } from "@/app/actions/articles";
 import { DeleteButton } from "./DeleteButton";
 import { RewriteButton } from "@/app/review/RewriteButton";
 import { PublishButton } from "@/app/review/PublishButton";
+import { XPostBox } from "./XPostBox";
 import { isJudgmentComplete } from "@/lib/gate";
 import { getTemplate } from "@/lib/templates";
 
@@ -308,6 +309,9 @@ export default async function ArticlePage({
               </>
             )}
           </div>
+
+          {/* X投稿文（コピペ用） */}
+          <XPostBox articleId={id} />
         </div>
       </div>
     </div>
