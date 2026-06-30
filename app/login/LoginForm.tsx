@@ -47,17 +47,9 @@ export default function LoginForm({ mode }: Props) {
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f7f9", padding: 16 }}>
       <div style={{ background: "#fff", border: "1px solid #e8ebef", borderRadius: 16, padding: "36px 36px 32px", width: "100%", maxWidth: 380, boxShadow: "0 8px 30px rgba(31,41,55,.08)" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 26 }}>
-          <span style={{
-            width: 52, height: 52, borderRadius: 14, marginBottom: 14,
-            background: "linear-gradient(135deg,#0f766b 0%,#15937f 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(15,118,107,.3)",
-          }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 19V10" /><path d="M10 19V5" /><path d="M16 19v-6" />
-              <path d="M20.5 4.5l-2.8 2.8" /><path d="M21 8V4h-4" />
-            </svg>
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-192.png" alt="" width={56} height={56}
+            style={{ width: 56, height: 56, borderRadius: 16, marginBottom: 14, display: "block", boxShadow: "0 4px 12px rgba(31,41,55,.18)" }} />
           <div style={{ fontWeight: 800, fontSize: 18, color: "#1f2937", fontFamily: "monospace" }}>記事スタジオ</div>
           <div style={{ fontFamily: "monospace", fontSize: 11, color: "#9aa3af", marginTop: 3 }}>kawacoins.com — 管理画面</div>
         </div>
