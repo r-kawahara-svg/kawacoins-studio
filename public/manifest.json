@@ -1,7 +1,7 @@
 {
-  "name": "実験用",
-  "short_name": "実験用",
-  "description": "実験用ツール",
+  "name": "記事スタジオ",
+  "short_name": "記事スタジオ",
+  "description": "kawacoins.com 記事作成・管理ツール",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",

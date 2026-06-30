@@ -4,12 +4,11 @@ import { getCurrentUser, isBypassEnabled } from "@/lib/auth";
 import { Sidebar } from "@/app/components/Sidebar";
 
 export const metadata: Metadata = {
-  // ログイン前にも見えるタブ名は固有名を出さない（共有先に内容が分からないように）
-  title: "実験用",
+  title: "記事スタジオ — kawacoins.com",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "実験用",
+    title: "記事スタジオ",
     statusBarStyle: "black-translucent",
   },
   icons: {

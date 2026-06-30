@@ -58,7 +58,8 @@ export default function LoginForm({ mode }: Props) {
               <path d="M20.5 4.5l-2.8 2.8" /><path d="M21 8V4h-4" />
             </svg>
           </span>
-          <div style={{ fontWeight: 800, fontSize: 18, color: "#1f2937", fontFamily: "monospace" }}>実験用</div>
+          <div style={{ fontWeight: 800, fontSize: 18, color: "#1f2937", fontFamily: "monospace" }}>記事スタジオ</div>
+          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#9aa3af", marginTop: 3 }}>kawacoins.com — 管理画面</div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", marginBottom: 22, color: "#6b7280", fontSize: 12 }}>
