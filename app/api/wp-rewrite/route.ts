@@ -7,6 +7,46 @@ export const dynamic = "force-dynamic";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// アンカー(style等)を含む <div> ブロックを、入れ子を考慮して丸ごと除去する。
+// 廃止した「運営者：カワコイン」ボックス等の旧ブロックを確実に消すために使う。
+function stripDivContaining(html: string, marker: string, anchor: string): string {
+  let result = html;
+  for (let guard = 0; guard < 6; guard++) {
+    const m = result.indexOf(marker);
+    if (m === -1) break;
+    // marker より前で anchor を含む <div を探す（ボックスの外枠）
+    let start = -1;
+    let from = m;
+    while (true) {
+      const idx = result.lastIndexOf("<div", from);
+      if (idx === -1) break;
+      const tagEnd = result.indexOf(">", idx);
+      if (tagEnd !== -1 && result.slice(idx, tagEnd).includes(anchor)) { start = idx; break; }
+      from = idx - 1;
+    }
+    // anchor が見つからなければ marker 直近の <div を使う
+    if (start === -1) start = result.lastIndexOf("<div", m);
+    if (start === -1) break;
+    // <div>/</div> の対応を数えて閉じ位置を特定
+    const re = /<div\b|<\/div>/gi;
+    re.lastIndex = start;
+    let depth = 0, end = -1, mm: RegExpExecArray | null;
+    while ((mm = re.exec(result))) {
+      if (mm[0].toLowerCase().startsWith("</")) { depth--; if (depth === 0) { end = re.lastIndex; break; } }
+      else depth++;
+    }
+    if (end === -1) break;
+    result = result.slice(0, start) + result.slice(end);
+  }
+  return result;
+}
+
+// 旧仕様の不要ブロックをまとめて除去
+function stripLegacyBlocks(html: string): string {
+  // 運営者ボックス（テーマ側に著者情報があるため廃止）
+  return stripDivContaining(html, "運営者：カワコイン", "f7f8fa");
+}
+
 // WordPress の記事を直接読み込み、方針に沿って本文を書き直してWPに書き戻す。
 // アプリDBを介さないので「連携切れ」が起きない。
 export async function POST(request: NextRequest) {
@@ -19,7 +59,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY 未設定" }, { status: 500 });
     }
 
-    const { title, contentHtml } = await getWpPost(postId);
+    const wp = await getWpPost(postId);
+    const title = wp.title;
+    // 旧仕様の不要ブロック（運営者ボックス等）はAIに渡す前に除去
+    const contentHtml = stripLegacyBlocks(wp.contentHtml);
     if (!contentHtml.trim()) {
       return NextResponse.json({ error: "記事本文が取得できませんでした" }, { status: 404 });
     }
@@ -59,6 +102,8 @@ ${contentHtml}`;
     let newHtml = msg.content.filter(b => b.type === "text").map(b => (b as { text: string }).text).join("").trim();
     // 念のためコードフェンスを除去
     newHtml = newHtml.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
+    // 出力にも旧ブロックが残っていれば最終除去（保険）
+    newHtml = stripLegacyBlocks(newHtml);
 
     if (newHtml.length < 50) {
       return NextResponse.json({ error: "書き直し結果が短すぎます（中断）" }, { status: 500 });
