@@ -56,7 +56,7 @@ export default async function DashboardPage() {
         ダッシュボード
       </div>
       <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1f2937", margin: "0 0 20px" }}>
-        記事スタジオの状況
+        実験用の状況
       </h1>
 
       {/* メトリクスカード（レスポンシブ） */}
