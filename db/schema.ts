@@ -11,6 +11,9 @@ export const topics = pgTable("topics", {
   competition: text("competition").default("mid"),   // 'low' | 'mid' | 'high'
   status: text("status").notNull().default("new"),   // 'new'|'drafting'|'drafted'|'dismissed'
   template: text("template"),                        // 'T1'|'T2'|'T3'|'T4'|'T5'
+  failureRaw: text("failure_raw"),                   // 失敗談の生データ（事実メモ）
+  failureLesson: text("failure_lesson"),             // 今ならどうするか
+  failureImages: jsonb("failure_images").default("[]"), // WP画像URL配列
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -74,6 +74,27 @@ export async function createDraftPost(input: WpPostInput): Promise<WpPostResult>
 }
 
 /**
+ * 任意の画像ファイルをWPメディアにアップロードし、ID と公開URL を返す。
+ */
+export async function uploadImage(buffer: Buffer, filename: string, mime: string): Promise<{ id: number; url: string }> {
+  const base = getWpBase();
+  const auth = getAuthHeader();
+  const formData = new FormData();
+  formData.append("file", new Blob([new Uint8Array(buffer)], { type: mime || "image/jpeg" }), filename);
+  const res = await fetch(`${base}/?rest_route=/wp/v2/media`, {
+    method: "POST",
+    headers: { Authorization: auth, "Content-Disposition": `attachment; filename="${filename}"` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`WordPress image upload error ${res.status}: ${text}`);
+  }
+  const data = await res.json() as { id: number; source_url?: string };
+  return { id: data.id, url: data.source_url ?? "" };
+}
+
+/**
  * Uploads a media file (PNG buffer) to WordPress and returns the media ID.
  */
 export async function uploadMedia(png: Buffer, filename: string): Promise<number> {

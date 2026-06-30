@@ -4,6 +4,7 @@ import { desc } from "drizzle-orm";
 import { addTopic } from "@/app/actions/topics";
 import { GenerateButton } from "./GenerateButton";
 import { SuggestPanel } from "./SuggestPanel";
+import { FailureStoryForm } from "./FailureStoryForm";
 
 const SOURCE_LABELS: Record<string, { label: string; bg: string }> = {
   earnings: { label: "決算", bg: "#2b5e8c" },
@@ -39,6 +40,9 @@ export default async function TopicsPage() {
 
       {/* AI ネタ提案 */}
       <SuggestPanel />
+
+      {/* 失敗談の生データ入力 → T5生成 */}
+      <FailureStoryForm />
 
       {/* 追加フォーム */}
       <div style={{ background: "#fff", border: "1px solid #dce1e8", borderRadius: 14, marginBottom: 20, padding: "20px 24px", boxShadow: "0 1px 2px rgba(22,29,43,.04)" }}>
