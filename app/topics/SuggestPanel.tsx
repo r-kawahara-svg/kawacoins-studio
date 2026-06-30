@@ -5,11 +5,12 @@ import { adoptSuggestedTopic } from "@/app/actions/topics";
 import type { TopicSuggestion } from "@/app/api/topics/suggest/route";
 
 const TEMPLATE_DESC: Record<string, string> = {
-  T1: "体験談/失敗",
+  T1: "体験レビュー",
   T2: "比較",
-  T3: "決算解説",
-  T4: "市況/マクロ",
-  T5: "初心者ガイド",
+  T3: "始め方",
+  T4: "決算個別株",
+  T5: "失敗談",
+  T6: "制度解説",
 };
 
 function ScoreDots({ score }: { score: number }) {
@@ -166,9 +167,16 @@ export function SuggestPanel() {
                 </div>
 
                 {/* Summary */}
-                <div style={{ fontSize: 12, color: "#4a5568", lineHeight: 1.55, flex: 1 }}>
+                <div style={{ fontSize: 12, color: "#4a5568", lineHeight: 1.55 }}>
                   {s.summary}
                 </div>
+
+                {/* 必要な一次体験 */}
+                {s.required_experience && (
+                  <div style={{ fontSize: 11.5, color: "#8a6d2f", background: "#fbf6e9", border: "1px solid #ecdcb0", borderRadius: 8, padding: "7px 10px", lineHeight: 1.5, flex: 1 }}>
+                    <span style={{ fontWeight: 700 }}>必要な体験：</span>{s.required_experience}
+                  </div>
+                )}
 
                 {/* Adopt button */}
                 <button

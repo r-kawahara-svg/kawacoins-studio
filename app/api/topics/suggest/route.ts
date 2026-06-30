@@ -6,9 +6,10 @@ const client = new Anthropic();
 
 export interface TopicSuggestion {
   title: string;
-  template: "T1" | "T2" | "T3" | "T4" | "T5";
+  template: "T1" | "T2" | "T3" | "T4" | "T5" | "T6";
   keyword: string;
   summary: string;
+  required_experience: string;
   revenue_score: number;
   source: "earnings" | "news" | "market" | "idea";
 }
@@ -37,13 +38,14 @@ export async function POST(request: NextRequest) {
               type: "object",
               properties: {
                 title: { type: "string", description: "記事タイトル（32字以内）。下記の多様なタイトル型から提案ごとに別の型を使う。年号は鮮度が効く時だけ" },
-                template: { type: "string", enum: ["T1", "T2", "T3", "T4", "T5"], description: "T1=体験談/失敗, T2=比較, T3=決算解説, T4=市況/マクロ, T5=初心者ガイド" },
+                template: { type: "string", enum: ["T1", "T2", "T3", "T4", "T5", "T6"], description: "T1=体験レビュー(最優先), T5=失敗談(最優先), T2=比較, T3=始め方, T4=決算個別株, T6=制度解説。一次体験で差別化できるT1/T5を優先する" },
                 keyword: { type: "string", description: "SEOメインキーワード（20字以内）" },
                 summary: { type: "string", description: "記事の切り口・強み（60字以内）" },
+                required_experience: { type: "string", description: "この記事に必要なあなたの一次体験を具体的に（例:実際に保有した銘柄と保有期間/失敗した金額と状況/サービスの使用感）。体験が主役のT1/T5は必須レベルで具体的に書く" },
                 revenue_score: { type: "number", description: "収益化ポテンシャル1〜5。アフィリエイト成約に繋がるほど高い" },
                 source: { type: "string", enum: ["earnings", "news", "market", "idea"], description: "earnings=決算, news=ニュース, market=市況, idea=解説" },
               },
-              required: ["title", "template", "keyword", "summary", "revenue_score", "source"],
+              required: ["title", "template", "keyword", "summary", "required_experience", "revenue_score", "source"],
             },
             minItems: 3,
             maxItems: 3,
@@ -57,10 +59,14 @@ export async function POST(request: NextRequest) {
       role: "user",
       content: `現在年: ${currentYear}年。キーワード:「${keyword}」
 
-以下の観点で投資ブログ記事のネタを3つ提案してください:
-- 体験談・失敗談・比較・決算分析など成約率が高い切り口を優先
-- 3つはそれぞれ異なるテンプレート(T1〜T5)・切り口にする
-- アフィリエイト（証券口座開設等）への自然な誘導ができるテーマを優先
+以下の方針で投資ブログ記事のネタを3つ提案してください:
+
+【最重要：一次体験で差別化】
+大手メディアに埋もれないため、筆者の「一次体験」が主役になるネタを優先する。
+- 3つのうち少なくとも2つは T1(体験レビュー) または T5(失敗談) にする。
+- 比較(T2)/解説(T3,T6)を出す場合も、「自分の体験・実運用を混ぜる前提」のテーマにする。
+- 各提案には required_experience に「この記事で必要なあなたの一次体験」を具体的に書く
+  （実際の保有銘柄・損失額・使用感など。これが書けないネタは提案しない）。
 - revenue_scoreは: 口座開設/iDeCo/NISAに繋がる=5, 商品紹介=4, 情報系=2〜3
 
 【タイトルの型（最重要・3つで別々の型を使い、ワンパターンを避ける）】
