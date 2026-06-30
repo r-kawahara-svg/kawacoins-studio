@@ -219,17 +219,6 @@ async function generateSeoAssets(title: string, keyword: string | null | undefin
   }
 }
 
-// 運営者ボックス（E-E-A-T。実体験・実務経験の範囲のみ。資格詐称はしない）
-const AUTHOR_BOX = `
-<div style="border:1px solid #e3e6ea;background:#f7f8fa;border-radius:12px;padding:16px 18px;margin:30px 0;display:flex;gap:14px;align-items:flex-start">
-  <div style="width:46px;height:46px;border-radius:50%;background:#0f766b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0">カ</div>
-  <div style="font-size:14px;line-height:1.75;color:#374151">
-    <strong style="color:#1f2937">運営者：カワコイン</strong><br>
-    個人投資家。株式投資の実体験とビジネスの実務経験をもとに、制度や数字を「個人のキャリア・ライフプランにどう効くか」という実践的な視点で解説しています。
-    <span style="display:block;margin-top:6px;font-size:12px;color:#6b7280">※本記事は一般的な情報提供であり、特定の銘柄・商品の売買を推奨するものではありません。投資の最終判断はご自身でお願いします。</span>
-  </div>
-</div>`;
-
 // 冒頭の要点サマリー（AIO/離脱対策）
 function summaryBox(items: string[]): string {
   if (!items?.length) return "";
@@ -280,8 +269,8 @@ async function buildTemplateHtml(article: ArticleRow, exps: ExpRow[], summary: s
   bodyHtml = applyJinRFormat(bodyHtml);
   bodyHtml = injectAffiliateRel(bodyHtml);
 
-  // 冒頭に要点サマリー、末尾に著者ボックス＋FAQ構造化データ
-  return summaryBox(summary) + bodyHtml + AUTHOR_BOX + faqJsonLd(faqData);
+  // 冒頭に要点サマリー、末尾にFAQ構造化データ（運営者情報はテーマ側にあるため付けない）
+  return summaryBox(summary) + bodyHtml + faqJsonLd(faqData);
 }
 
 // 公開中のWP記事を、現在のDB内容で「その場で」更新する（再投稿不要）。
