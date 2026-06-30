@@ -139,7 +139,7 @@ export function Sidebar({ bypass }: Props) {
           <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
-      <span style={{ color: C.brand, fontWeight: 800, fontSize: 15, fontFamily: "monospace" }}>実験用</span>
+      <span style={{ color: C.brand, fontWeight: 800, fontSize: 15, fontFamily: "monospace" }}>記事スタジオ</span>
     </div>
   );
 
@@ -204,7 +204,7 @@ export function Sidebar({ bypass }: Props) {
         </svg>
       </span>
       <div style={{ minWidth: 0 }}>
-        <div style={{ color: C.brand, fontWeight: 800, fontSize: 14.5 }}>実験用</div>
+        <div style={{ color: C.brand, fontWeight: 800, fontSize: 14.5 }}>記事スタジオ</div>
         <div style={{ fontSize: 10.5, color: C.sub, fontFamily: "monospace" }}>kawacoins.com</div>
       </div>
     </div>
