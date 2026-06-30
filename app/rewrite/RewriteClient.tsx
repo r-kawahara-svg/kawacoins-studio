@@ -57,6 +57,10 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
       text: `記事全体を読み直し、不自然・分かりにくい箇所を書き直す。走り書きのようなコメント（例「安いので！」）は理由や文脈を補って自然な文章にする。回りくどい/冗長な文や唐突な言い回しも直す。事実や数値は変えず、表現と読みやすさだけ改善する。`,
     },
     {
+      label: "🔥 体験を足してリライト",
+      text: `この記事に筆者の一次体験（実際に保有/売買した銘柄・使用感・失敗談など）を具体的に加筆し、実体験で差別化する。比較・解説部分は活かしつつ、体験エピソードを厚くする。事実は創作せず、自然な一人称で。`,
+    },
+    {
       label: "🔁 最新年＋全体見直し",
       text: `古い年号や「今年」は${currentYear}年基準に直し（未確定は「予定」と明記）、記事全体を読み直して不自然な箇所（走り書きコメント等）を自然な文章に整える。事実や数値は変えない。`,
     },
@@ -161,15 +165,21 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
           <div style={{ padding: "32px", textAlign: "center", color: "#697587", fontSize: 13 }}>WordPress記事がありません</div>
         )}
 
-        {posts.map((p) => {
+        {[...posts].sort((a, b) => (viewsMap[b.id] ?? -1) - (viewsMap[a.id] ?? -1)).map((p, idx) => {
           const st = results[p.id];
+          const pv = viewsMap[p.id] ?? 0;
+          const isTopPv = pv > 0 && idx < 3; // PV上位3記事を強調（育成候補）
           return (
             <label key={p.id} style={{
               display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
               borderBottom: "1px solid #eef1f5", cursor: running ? "default" : "pointer",
-              background: current === p.id ? "#f0fdf4" : "#fff",
+              borderLeft: isTopPv ? "3px solid #d98a1f" : "3px solid transparent",
+              background: current === p.id ? "#f0fdf4" : isTopPv ? "#fdfaf2" : "#fff",
             }}>
               <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} disabled={running} style={{ width: 16, height: 16, flexShrink: 0 }} />
+              {isTopPv && (
+                <span style={{ background: "#f8eccf", color: "#8a6d2f", borderRadius: 5, padding: "2px 7px", fontSize: 10, fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }} title="PVが付いている育成候補。体験を足して伸ばそう">🔥 育成候補</span>
+              )}
               <span style={{ background: "#eef2f7", color: "#475569", borderRadius: 5, padding: "2px 8px", fontSize: 10.5, fontWeight: 700, fontFamily: "monospace", flexShrink: 0 }}>
                 {STATUS_LABEL[p.status] ?? p.status}
               </span>
