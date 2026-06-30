@@ -44,14 +44,27 @@ export default function LoginForm({ mode }: Props) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#e9ecf0" }}>
-      <div style={{ background: "#fff", border: "1px solid #dce1e8", borderRadius: 14, padding: "36px 40px", width: 380, boxShadow: "0 8px 24px rgba(22,29,43,.08)" }}>
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 18, color: "#161d2b", display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
-            <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: "#0f766b" }} />
-            記事スタジオ
-          </div>
-          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#7d889b" }}>kawacoins.com</div>
+    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f7f9", padding: 16 }}>
+      <div style={{ background: "#fff", border: "1px solid #e8ebef", borderRadius: 16, padding: "36px 36px 32px", width: "100%", maxWidth: 380, boxShadow: "0 8px 30px rgba(31,41,55,.08)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 26 }}>
+          <span style={{
+            width: 52, height: 52, borderRadius: 14, marginBottom: 14,
+            background: "linear-gradient(135deg,#0f766b 0%,#15937f 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 12px rgba(15,118,107,.3)",
+          }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19V10" /><path d="M10 19V5" /><path d="M16 19v-6" />
+              <path d="M20.5 4.5l-2.8 2.8" /><path d="M21 8V4h-4" />
+            </svg>
+          </span>
+          <div style={{ fontWeight: 800, fontSize: 18, color: "#1f2937", fontFamily: "monospace" }}>記事スタジオ</div>
+          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#9aa3af", marginTop: 3 }}>kawacoins.com — 管理画面</div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", marginBottom: 22, color: "#6b7280", fontSize: 12 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          関係者専用ページ
         </div>
 
         {mode === "password" ? (
