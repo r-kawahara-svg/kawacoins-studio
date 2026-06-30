@@ -273,21 +273,9 @@ async function buildTemplateHtml(article: ArticleRow, exps: ExpRow[], summary: s
   bodyHtml = applyJinRFormat(bodyHtml);
   bodyHtml = injectAffiliateRel(bodyHtml);
 
-  // 著者プロフィール（設定で登録されていれば末尾に挿入。E-E-A-T）
-  const { getSetting } = await import("@/lib/settings");
-  const profile = (await getSetting("author_profile"))?.trim();
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-  const authorBox = profile
-    ? `\n<div style="border-left:4px solid #0f766b;background:#f1f7f5;border-radius:0 10px 10px 0;padding:14px 18px;margin:30px 0;font-size:13.5px;line-height:1.85;color:#374151">
-  <div style="font-weight:700;color:#1f2937;margin-bottom:4px">この記事の筆者</div>
-  ${profile.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string)).replace(/\n/g, "<br>")}
-  <div style="font-size:11.5px;color:#9aa3af;margin-top:8px">最終更新: ${dateStr}</div>
-</div>`
-    : "";
-
-  // 冒頭に要点サマリー、末尾に著者プロフィール＋FAQ構造化データ
-  return summaryBox(summary) + bodyHtml + authorBox + faqJsonLd(faqData);
+  // 著者プロフィールはWordPressテーマ側で表示されるため、記事本文には挿入しない。
+  // 冒頭に要点サマリー、末尾にFAQ構造化データ
+  return summaryBox(summary) + bodyHtml + faqJsonLd(faqData);
 }
 
 // 公開中のWP記事を、現在のDB内容で「その場で」更新する（再投稿不要）。
