@@ -132,6 +132,16 @@ table {
   50% { opacity: 0.45; }
 }
 
+/* ─── ローディング表示（ページ遷移・更新中）──────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes loadingbar {
+  0%   { left: -40%; width: 40%; }
+  50%  { width: 55%; }
+  100% { left: 100%; width: 40%; }
+}
+/* リンク/ボタン押下後の遷移待ち中はカーソルを進行中に */
+a:active, button:active { cursor: progress; }
+
 /* ─── レスポンシブ グリッド ──────────────────────────────── */
 
 /* 記事詳細: デスクトップ2列 → モバイル1列 */
