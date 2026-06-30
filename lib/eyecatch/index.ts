@@ -407,10 +407,12 @@ export function generateEyecatchSvg(
 export async function generateEyecatchPng(
   title: string,
   template: string | null | undefined,
-  options: { keyword?: string; subtitle?: string; description?: string } = {}
+  options: { keyword?: string; subtitle?: string; description?: string; photoQuery?: string } = {}
 ): Promise<Buffer> {
-  // 背景写真を取得（UNSPLASH_ACCESS_KEY 未設定/失敗時は null → グラデーション）
-  const unsplashKeyword = (template ? UNSPLASH_KEYWORDS[template] : null) ?? DEFAULT_UNSPLASH_KEYWORD;
+  // 背景写真を取得。記事内容に合う photoQuery を最優先、無ければテンプレ既定。
+  const unsplashKeyword = options.photoQuery?.trim()
+    || (template ? UNSPLASH_KEYWORDS[template] : null)
+    || DEFAULT_UNSPLASH_KEYWORD;
   const photoBg = await fetchUnsplashPhoto(unsplashKeyword);
 
   const svg = generateEyecatchSvg(title, template, { ...options, photoBg });

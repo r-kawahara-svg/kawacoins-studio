@@ -173,12 +173,12 @@ export class PublishError extends Error {
 type ArticleRow = typeof articles.$inferSelect;
 type ExpRow = { label: string; choice: string | null; note: string | null };
 
-export interface SeoAssets { metaDescription: string; summary: string[]; slug: string }
+export interface SeoAssets { metaDescription: string; summary: string[]; slug: string; photoQuery: string }
 
 // メタディスクリプション・冒頭要点・英数スラッグをまとめて1回のAI呼び出しで生成。
 // キー未設定/失敗時は空（その場合は各機能をスキップ）。
 async function generateSeoAssets(title: string, keyword: string | null | undefined, bodyMd: string): Promise<SeoAssets> {
-  const fallback: SeoAssets = { metaDescription: "", summary: [], slug: "" };
+  const fallback: SeoAssets = { metaDescription: "", summary: [], slug: "", photoQuery: "" };
   if (!process.env.ANTHROPIC_API_KEY) return fallback;
   try {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
@@ -198,7 +198,8 @@ async function generateSeoAssets(title: string, keyword: string | null | undefin
 {
   "metaDescription": "検索結果用の説明文。110字以内。キーワードを含め、読みたくなる自然文。誇張・煽りNG",
   "summary": ["記事の要点を3つ。各40字以内。結論先出しで具体的に"],
-  "slug": "英小文字とハイフンのみの短いURLスラッグ。3〜5語。内容を表す英単語"
+  "slug": "英小文字とハイフンのみの短いURLスラッグ。3〜5語。内容を表す英単語",
+  "photoQuery": "アイキャッチ背景写真のUnsplash検索ワード(英語2〜4語)。記事内容に合う一般的な被写体にする。企業名・商品名・キャラクター名など固有名詞や商標は使わない(例:サンリオ決算→toys character goods store, iDeCo→retirement savings planning)"
 }`,
       }],
     });
@@ -209,10 +210,13 @@ async function generateSeoAssets(title: string, keyword: string | null | undefin
     const o = JSON.parse(json[0]) as Partial<SeoAssets>;
     let slug = (o.slug ?? "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     if (slug.length < 3) slug = "";
+    // 写真検索ワードは英数スペースのみ許可（固有名詞混入の保険として記号除去）
+    const photoQuery = (o.photoQuery ?? "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
     return {
       metaDescription: (o.metaDescription ?? "").slice(0, 120),
       summary: Array.isArray(o.summary) ? o.summary.slice(0, 3).map(s => String(s)) : [],
       slug,
+      photoQuery,
     };
   } catch {
     return fallback;
@@ -310,6 +314,7 @@ export async function updatePublishedArticle(articleId: string): Promise<Publish
     const png = await generateEyecatchPng(article.title, article.template, {
       keyword: topicRow?.keyword ?? undefined,
       description: topicRow?.summary?.slice(0, 50) ?? undefined,
+      photoQuery: seo.photoQuery,
     });
     const mediaId = await uploadMedia(png, `eyecatch-${article.id.slice(0, 8)}-${Date.now()}.png`);
     await setFeaturedMedia(article.wpPostId, mediaId);
@@ -378,7 +383,7 @@ export async function publishArticleById(articleId: string): Promise<PublishResu
 
       // アイキャッチ生成・アップロード（失敗しても記事投稿を継続）
       try {
-        const png = await generateEyecatchPng(article.title, article.template, eyecatchOpts);
+        const png = await generateEyecatchPng(article.title, article.template, { ...eyecatchOpts, photoQuery: seo.photoQuery });
         const filename = `eyecatch-${article.id.slice(0, 8)}.png`;
         const mediaId = await uploadMedia(png, filename);
         await setFeaturedMedia(wpResult.id, mediaId);
