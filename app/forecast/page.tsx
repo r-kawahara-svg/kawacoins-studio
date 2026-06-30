@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { listWpPosts } from "@/lib/wp";
 import { getTrafficTrend } from "@/lib/analytics";
 import { trackUsage } from "@/lib/track-usage";
+import { PaceForm } from "./PaceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -59,15 +60,22 @@ async function buildForecast(input: {
 
 const yen = (n: number) => `¥${Math.round(n).toLocaleString()}`;
 
-export default async function ForecastPage() {
+export default async function ForecastPage({ searchParams }: { searchParams: Promise<{ pace?: string }> }) {
+  const sp = await searchParams;
+
   let posts: Awaited<ReturnType<typeof listWpPosts>> = [];
   try { posts = await listWpPosts(); } catch { /* WP未設定 */ }
   const published = posts.filter(p => p.status === "publish");
 
-  // 投稿ペース（直近90日の公開数 ÷ 3）
+  // 実績の投稿ペース（直近90日の公開数 ÷ 3）
   const now = Date.now();
   const d90 = published.filter(p => p.date && (now - new Date(p.date).getTime()) < 90 * 864e5).length;
-  const pacePerMonth = Math.max(0, Math.round((d90 / 3) * 10) / 10);
+  const autoPace = Math.max(0, Math.round((d90 / 3) * 10) / 10);
+
+  // 入力されたペースがあればそれを使う（無ければ実績ペース）
+  const paceInput = sp.pace != null && sp.pace !== "" ? Number(sp.pace) : NaN;
+  const pacePerMonth = Number.isFinite(paceInput) && paceInput >= 0 ? paceInput : autoPace;
+  const isCustomPace = pacePerMonth !== autoPace;
 
   const trend = await getTrafficTrend(28);
   const monthlyPv = trend.configured ? Math.round(trend.current.views * 30 / 28) : 0;
@@ -97,7 +105,7 @@ export default async function ForecastPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
         {[
           { label: "公開記事数", value: `${published.length}本` },
-          { label: "投稿ペース", value: `月 ${pacePerMonth}本` },
+          { label: isCustomPace ? "投稿ペース（仮定）" : "投稿ペース（実績）", value: `月 ${pacePerMonth}本` },
           { label: "現在の月間PV", value: trend.configured ? monthlyPv.toLocaleString() : "—" },
           { label: "流入トレンド", value: trendPct == null ? "—" : `${trendPct > 0 ? "+" : ""}${trendPct}%` },
         ].map(m => (
@@ -107,6 +115,9 @@ export default async function ForecastPage() {
           </div>
         ))}
       </div>
+
+      {/* 投稿ペース入力 */}
+      <PaceForm defaultPace={pacePerMonth} autoPace={autoPace} />
 
       {!forecast ? (
         <div style={{ ...card, padding: "20px", color: "#8a6d2f", background: "#fbf6e9", fontSize: 13 }}>
