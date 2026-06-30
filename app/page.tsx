@@ -3,11 +3,44 @@ import { topics, articles } from "@/db/schema";
 import { eq, count, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { listWpPosts } from "@/lib/wp";
-import { getPageMetrics, lookupMetric } from "@/lib/analytics";
+import { getPageMetrics, lookupMetric, getTrafficTrend, type TrafficTrend } from "@/lib/analytics";
 import { gradeOf, GRADE_STYLE, GRADE_FALLBACK } from "@/lib/grade";
 import { analyzeCategories } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
+
+// 流入トレンドをAIが一言コメント（Haiku）。キー無し/失敗時は定型文。
+async function trendComment(t: TrafficTrend): Promise<string> {
+  const pct = t.previous.views > 0
+    ? Math.round(((t.current.views - t.previous.views) / t.previous.views) * 100)
+    : null;
+  const fallback = pct == null
+    ? "前期間のデータが少なく比較できません。"
+    : pct > 5 ? `流入は前期間より約${pct}%増えています。良い傾向です。`
+    : pct < -5 ? `流入は前期間より約${Math.abs(pct)}%減っています。テコ入れを検討しましょう。`
+    : "流入はほぼ横ばいです。";
+  if (!t.configured || !process.env.ANTHROPIC_API_KEY) return fallback;
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 200,
+      messages: [{
+        role: "user",
+        content: `投資ブログの直近${t.days}日とその前${t.days}日のアクセスです。
+直近: PV ${t.current.views} / ユーザー ${t.current.users}
+前期間: PV ${t.previous.views} / ユーザー ${t.previous.users}
+
+流入が増えているか・横ばいか・減っているかを判定し、次の一手まで含めて2文以内で簡潔にコメント。煽らず事実ベースで。文章のみ返す。`,
+      }],
+    });
+    const text = msg.content.filter(b => b.type === "text").map(b => (b as { text: string }).text).join("").trim();
+    return text || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 const CAT_STATUS_STYLE: Record<string, { bg: string; text: string }> = {
   未着手: { bg: "#fae3e1", text: "#9c4f47" },
@@ -26,6 +59,13 @@ export default async function DashboardPage() {
   try { posts = await listWpPosts(); } catch { /* WP未設定など */ }
   posts = posts.filter(p => p.status !== "future");
   const pm = await getPageMetrics(365);
+
+  // 最近のサイト状況（直近28日 vs 前28日）＋AIコメント
+  const trend = await getTrafficTrend(28);
+  const trendPct = trend.previous.views > 0
+    ? Math.round(((trend.current.views - trend.previous.views) / trend.previous.views) * 100)
+    : null;
+  const aiComment = trend.configured && !trend.error ? await trendComment(trend) : "";
 
   const ranked = posts
     .map(p => ({ ...p, metric: lookupMetric(pm, p.link, p.id) }))
@@ -70,6 +110,46 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* 最近のサイト状況（流入トレンド＋AIコメント） */}
+      {trend.configured && !trend.error && (
+        <div style={{ ...card, padding: "16px 20px", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>最近のサイト状況</span>
+            <span style={{ fontSize: 11, color: "#9aa3af", fontFamily: "monospace" }}>直近28日 vs 前28日</span>
+            {trendPct != null && (
+              <span style={{
+                marginLeft: "auto", fontSize: 13, fontWeight: 800, fontFamily: "monospace",
+                color: trendPct > 5 ? "#2f7d4f" : trendPct < -5 ? "#b5564e" : "#6b7280",
+              }}>
+                {trendPct > 0 ? "▲" : trendPct < 0 ? "▼" : "→"} {Math.abs(trendPct)}%
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>PV（直近28日）</div>
+              <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "monospace", color: "#1f2937" }}>
+                {trend.current.views.toLocaleString()}
+                <span style={{ fontSize: 11, fontWeight: 400, color: "#9aa3af", marginLeft: 6 }}>前: {trend.previous.views.toLocaleString()}</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>ユーザー（直近28日）</div>
+              <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "monospace", color: "#1f2937" }}>
+                {trend.current.users.toLocaleString()}
+                <span style={{ fontSize: 11, fontWeight: 400, color: "#9aa3af", marginLeft: 6 }}>前: {trend.previous.users.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          {aiComment && (
+            <div style={{ display: "flex", gap: 8, background: "#f1f7f5", border: "1px solid #cfe0dc", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#37494f", lineHeight: 1.7 }}>
+              <span style={{ flexShrink: 0 }}>💬</span>
+              <span>{aiComment}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* やること */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 24 }}>

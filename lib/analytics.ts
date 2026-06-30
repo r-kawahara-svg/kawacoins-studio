@@ -92,6 +92,52 @@ export async function getPageMetrics(days = 365): Promise<PageMetrics> {
   }
 }
 
+export interface TrafficTrend {
+  configured: boolean;
+  error?: string;
+  days: number;
+  current: { views: number; users: number };
+  previous: { views: number; users: number };
+}
+
+// 直近N日 と その前N日 のサイト全体のPV/ユーザーを取得して比較する
+export async function getTrafficTrend(days = 28): Promise<TrafficTrend> {
+  const empty: TrafficTrend = { configured: false, days, current: { views: 0, users: 0 }, previous: { views: 0, users: 0 } };
+  const propertyId = process.env.GA4_PROPERTY_ID;
+  const saJson = process.env.GA_SERVICE_ACCOUNT_JSON;
+  if (!propertyId || !saJson) return { ...empty, error: "GA4 未設定" };
+
+  try {
+    const credentials = JSON.parse(saJson) as { client_email: string; private_key: string };
+    const { BetaAnalyticsDataClient } = await import("@google-analytics/data");
+    const client = new BetaAnalyticsDataClient({
+      credentials: {
+        client_email: credentials.client_email,
+        private_key: credentials.private_key.replace(/\\n/g, "\n"),
+      },
+    });
+    const [resp] = await client.runReport({
+      property: `properties/${propertyId}`,
+      dateRanges: [
+        { startDate: `${days - 1}daysAgo`, endDate: "today" },          // date_range_0 = 直近
+        { startDate: `${days * 2 - 1}daysAgo`, endDate: `${days}daysAgo` }, // date_range_1 = その前
+      ],
+      metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
+    });
+    const out = { current: { views: 0, users: 0 }, previous: { views: 0, users: 0 } };
+    for (const row of resp.rows ?? []) {
+      const dr = row.dimensionValues?.[0]?.value;
+      const views = Number(row.metricValues?.[0]?.value ?? 0);
+      const users = Number(row.metricValues?.[1]?.value ?? 0);
+      if (dr === "date_range_0") out.current = { views, users };
+      else if (dr === "date_range_1") out.previous = { views, users };
+    }
+    return { configured: true, days, ...out };
+  } catch (e) {
+    return { ...empty, configured: true, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 function candidatePaths(link: string, postId: number): string[] {
   const set = new Set<string>();
   if (link) {
