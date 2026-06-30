@@ -35,12 +35,22 @@ function dummyUser(): Partial<User> {
 /**
  * 現在のログインユーザーを返す。
  * バイパス有効時         → ダミーユーザー
- * SITE_PASSWORD モード時 → ダミーユーザー（proxy.ts で Cookie 検証済みのため信頼）
+ * SITE_PASSWORD モード時 → 認証Cookieを検証し、有効ならダミーユーザー、無効/未認証なら null
  * 通常時（Supabase）     → Supabase auth.getUser() の結果
  */
 export async function getCurrentUser(): Promise<Partial<User> | null> {
   if (isBypassEnabled()) return dummyUser();
-  if (isSitePasswordMode()) return dummyUser();
+
+  // 合言葉モード: 認証Cookieを実際に検証する（未認証なら null＝サイドバー等を出さない）
+  if (isSitePasswordMode()) {
+    const { cookies } = await import("next/headers");
+    const { COOKIE_NAME, makeAuthToken } = await import("@/lib/site-auth");
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    if (token && token === await makeAuthToken(process.env.SITE_PASSWORD!)) {
+      return dummyUser();
+    }
+    return null;
+  }
 
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
