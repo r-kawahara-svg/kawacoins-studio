@@ -8,6 +8,7 @@ import { ExperienceForm } from "@/app/review/ExperienceForm";
 import { publishArticle } from "@/app/actions/articles";
 import { DeleteButton } from "./DeleteButton";
 import { RewriteButton } from "@/app/review/RewriteButton";
+import { PublishButton } from "@/app/review/PublishButton";
 import { isJudgmentComplete } from "@/lib/gate";
 import { getTemplate } from "@/lib/templates";
 
@@ -241,27 +242,9 @@ export default async function ArticlePage({
                 公開済み {article.publishedAt ? `— ${new Date(article.publishedAt).toLocaleDateString("ja-JP")}` : ""}
               </div>
             ) : isTemplateArticle ? (
-              /* テンプレート記事: 体験入力→承認→公開 */
-              article.status === "approved" ? (
-                <form action={publishArticle}>
-                  <input type="hidden" name="articleId" value={id} />
-                  <button
-                    type="submit"
-                    style={{
-                      background: "#0f766b",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 9,
-                      padding: "9px 20px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      width: "100%",
-                    }}
-                  >
-                    WPに投稿する
-                  </button>
-                </form>
+              /* テンプレート記事: 体験入力→承認→公開（体験スロット無しは直接投稿可） */
+              (article.status === "approved" || slots.length === 0) ? (
+                <PublishButton articleId={id} />
               ) : (
                 <div>
                   {!isExpReady && (
