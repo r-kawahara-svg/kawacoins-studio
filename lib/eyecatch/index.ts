@@ -41,7 +41,11 @@ function buildTextPath(
   let penRef = 0;
   const parts: string[] = [];
   for (const ch of [...text]) {
-    const f = jp.charToGlyph(ch).index ? jp : (lat.charToGlyph(ch).index ? lat : jp);
+    const inJp = jp.charToGlyph(ch).index;
+    const inLat = lat.charToGlyph(ch).index;
+    // どちらのフォントにも無い文字(.notdef=豆腐□)は描画も加算もせずスキップ
+    if (!inJp && !inLat) continue;
+    const f = inJp ? jp : lat;
     const glyph = f.charToGlyph(ch);
     // 各グリフは原点(x=0)で描き、translate で配置する。
     // getPath に大きな x を渡すとパス座標が巨大になり、resvg が特定グリフの
@@ -70,7 +74,10 @@ function measureTextWidth(text: string, fontSize: number): number {
   const { jp, lat } = getFonts();
   let penRef = 0;
   for (const ch of [...text]) {
-    const f = jp.charToGlyph(ch).index ? jp : (lat.charToGlyph(ch).index ? lat : jp);
+    const inJp = jp.charToGlyph(ch).index;
+    const inLat = lat.charToGlyph(ch).index;
+    if (!inJp && !inLat) continue;
+    const f = inJp ? jp : lat;
     const glyph = f.charToGlyph(ch);
     penRef += (glyph.advanceWidth ?? f.unitsPerEm) * (REF / f.unitsPerEm);
   }
