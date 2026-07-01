@@ -3,7 +3,7 @@ import { topics, articles } from "@/db/schema";
 import { eq, count, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { listWpPosts } from "@/lib/wp";
-import { getPageMetrics, lookupMetric, getTrafficTrend, type TrafficTrend } from "@/lib/analytics";
+import { getPageMetrics, lookupMetric, getTrafficTrend, getTodayActivity, type TrafficTrend } from "@/lib/analytics";
 import { gradeOf, GRADE_STYLE, GRADE_FALLBACK } from "@/lib/grade";
 import { analyzeCategories } from "@/lib/categories";
 
@@ -67,6 +67,9 @@ export default async function DashboardPage() {
     : null;
   const aiComment = trend.configured && !trend.error ? await trendComment(trend) : "";
 
+  // 今日のサイト状況
+  const today = await getTodayActivity();
+
   const ranked = posts
     .map(p => ({ ...p, metric: lookupMetric(pm, p.link, p.id) }))
     .sort((a, b) => (b.metric?.views ?? -1) - (a.metric?.views ?? -1));
@@ -98,6 +101,35 @@ export default async function DashboardPage() {
       <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1f2937", margin: "0 0 20px" }}>
         記事スタジオの状況
       </h1>
+
+      {/* 今日のサイト状況 */}
+      {today.configured && !today.error && (
+        <div style={{ ...card, padding: "16px 20px", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>今日のサイト状況</span>
+            <span style={{ fontSize: 12, color: "#374151" }}>
+              訪問者 <b style={{ color: "#0f766b", fontFamily: "monospace", fontSize: 15 }}>{today.users.toLocaleString()}</b> 人 ・ 閲覧 <b style={{ fontFamily: "monospace" }}>{today.views.toLocaleString()}</b> PV
+            </span>
+          </div>
+          {today.pages.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: "#9aa3af" }}>今日はまだアクセスがありません。</div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 11.5, color: "#6b7280", marginBottom: 6 }}>見られたページ</div>
+              {today.pages.map((p, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: i > 0 ? "1px solid #f2f4f6" : "none" }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</span>
+                  <span style={{ fontSize: 12, fontFamily: "monospace", color: "#0f766b", fontWeight: 700, flexShrink: 0 }}>{p.views} PV</span>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", color: "#9aa3af", flexShrink: 0, minWidth: 44, textAlign: "right" }}>{p.users}人</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 10.5, color: "#9aa3af", marginTop: 10, lineHeight: 1.6 }}>
+            ※ 自分を除くには、GA4の「内部トラフィックの除外」で自分のIPを登録してください（GA管理画面での設定）。
+          </div>
+        </div>
+      )}
 
       {/* メトリクスカード（レスポンシブ） */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>

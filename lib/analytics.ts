@@ -138,6 +138,58 @@ export async function getTrafficTrend(days = 28): Promise<TrafficTrend> {
   }
 }
 
+export interface TodayActivity {
+  configured: boolean;
+  error?: string;
+  users: number;
+  views: number;
+  pages: { title: string; views: number; users: number }[];
+}
+
+// 今日のアクセス状況（訪問ユーザー数・PV・ページ別内訳）
+export async function getTodayActivity(): Promise<TodayActivity> {
+  const empty: TodayActivity = { configured: false, users: 0, views: 0, pages: [] };
+  const propertyId = process.env.GA4_PROPERTY_ID;
+  const saJson = process.env.GA_SERVICE_ACCOUNT_JSON;
+  if (!propertyId || !saJson) return { ...empty, error: "GA4 未設定" };
+
+  try {
+    const credentials = JSON.parse(saJson) as { client_email: string; private_key: string };
+    const { BetaAnalyticsDataClient } = await import("@google-analytics/data");
+    const client = new BetaAnalyticsDataClient({
+      credentials: { client_email: credentials.client_email, private_key: credentials.private_key.replace(/\\n/g, "\n") },
+    });
+    const property = `properties/${propertyId}`;
+    const today = [{ startDate: "today", endDate: "today" }];
+
+    // ① 今日の合計（ユニークユーザー・PV）
+    const [totals] = await client.runReport({
+      property, dateRanges: today,
+      metrics: [{ name: "totalUsers" }, { name: "screenPageViews" }],
+    });
+    const users = Number(totals.rows?.[0]?.metricValues?.[0]?.value ?? 0);
+    const views = Number(totals.rows?.[0]?.metricValues?.[1]?.value ?? 0);
+
+    // ② 今日のページ別内訳
+    const [byPage] = await client.runReport({
+      property, dateRanges: today,
+      dimensions: [{ name: "pageTitle" }],
+      metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
+      orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+      limit: 20,
+    });
+    const pages = (byPage.rows ?? []).map(r => ({
+      title: r.dimensionValues?.[0]?.value ?? "(不明)",
+      views: Number(r.metricValues?.[0]?.value ?? 0),
+      users: Number(r.metricValues?.[1]?.value ?? 0),
+    }));
+
+    return { configured: true, users, views, pages };
+  } catch (e) {
+    return { ...empty, configured: true, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 function candidatePaths(link: string, postId: number): string[] {
   const set = new Set<string>();
   if (link) {
