@@ -17,11 +17,12 @@ const STATUS_LABEL: Record<string, string> = {
   publish: "公開", draft: "下書き", future: "予約", pending: "承認待ち", private: "非公開",
 };
 
-export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
+export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured, programs }: {
   posts: WpPost[];
   currentYear: number;
   viewsMap: Record<number, number | null>;
   gaConfigured: boolean;
+  programs: { id: string; name: string }[];
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [direction, setDirection] = useState(
@@ -33,6 +34,24 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
   const [results, setResults] = useState<Record<number, RunResult>>({});
   const [current, setCurrent] = useState<number | null>(null);
   const [eyecatchRun, setEyecatchRun] = useState<Record<number, "running" | "done" | "error">>({});
+  const [affSel, setAffSel] = useState<Record<number, string>>({});
+  const [affRun, setAffRun] = useState<Record<number, { state: "running" | "done" | "error"; msg?: string }>>({});
+
+  async function swapAffiliate(id: number) {
+    const programId = affSel[id];
+    if (!programId) return;
+    setAffRun((r) => ({ ...r, [id]: { state: "running" } }));
+    try {
+      const res = await fetch(`/api/wp-swap-affiliate`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: id, programId }),
+      });
+      const data = await res.json();
+      setAffRun((r) => ({ ...r, [id]: res.ok ? { state: "done", msg: `${data.program}に変更` } : { state: "error", msg: data.error } }));
+    } catch (e) {
+      setAffRun((r) => ({ ...r, [id]: { state: "error", msg: String(e) } }));
+    }
+  }
 
   async function regenEyecatch(id: number) {
     setEyecatchRun((r) => ({ ...r, [id]: "running" }));
@@ -201,6 +220,33 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured }: {
               >
                 {eyecatchRun[p.id] === "running" ? "生成中…" : eyecatchRun[p.id] === "done" ? "✓ 画像更新" : eyecatchRun[p.id] === "error" ? "画像失敗" : "🖼 アイキャッチ"}
               </button>
+              {/* アフィリ差し替え（プルダウンで選択→CTAだけ差し替え） */}
+              {programs.length > 0 && (
+                <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                  <select
+                    value={affSel[p.id] ?? ""}
+                    onChange={(e) => setAffSel((s) => ({ ...s, [p.id]: e.target.value }))}
+                    disabled={affRun[p.id]?.state === "running"}
+                    style={{ fontSize: 11.5, border: "1px solid #d6dee0", borderRadius: 7, padding: "5px 6px", background: "#fff", color: "#374151", maxWidth: 130 }}
+                  >
+                    <option value="">アフィリ選択…</option>
+                    {programs.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
+                  </select>
+                  <button
+                    onClick={() => swapAffiliate(p.id)}
+                    disabled={!affSel[p.id] || affRun[p.id]?.state === "running"}
+                    title="広告をこのアフィリに差し替え（記事全体はそのまま）"
+                    style={{
+                      fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", minHeight: 32,
+                      color: affRun[p.id]?.state === "done" ? "#0f766b" : affRun[p.id]?.state === "error" ? "#c4453a" : "#5b6470",
+                      background: "#f2f5f4", border: "1px solid #d6dee0", borderRadius: 7, padding: "5px 9px",
+                      cursor: !affSel[p.id] ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {affRun[p.id]?.state === "running" ? "変更中…" : affRun[p.id]?.state === "done" ? "✓ 変更" : affRun[p.id]?.state === "error" ? "失敗" : "広告変更"}
+                  </button>
+                </span>
+              )}
               {p.date && <span style={{ fontSize: 11, color: "#9ba8b5", fontFamily: "monospace", flexShrink: 0 }}>{p.date.slice(0, 10)}</span>}
               {st && (
                 <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, textAlign: "right", color: st.state === "done" ? "#0f766b" : st.state === "error" ? "#c4453a" : "#b07d2e" }}>

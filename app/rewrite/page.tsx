@@ -1,11 +1,18 @@
 import { listWpPosts, type WpPostSummary } from "@/lib/wp";
 import { getPageViews, lookupViews } from "@/lib/analytics";
+import { db } from "@/db";
+import { affiliatePrograms } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { RewriteClient } from "./RewriteClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function RewritePage() {
   const currentYear = new Date().getFullYear();
+
+  // 登録済みアフィリ（差し替え用プルダウン）
+  const programs = await db.select({ id: affiliatePrograms.id, name: affiliatePrograms.name })
+    .from(affiliatePrograms).where(eq(affiliatePrograms.active, true));
 
   let posts: WpPostSummary[] = [];
   let loadError: string | null = null;
@@ -51,7 +58,7 @@ export default async function RewritePage() {
           WordPress記事の読み込みに失敗しました: {loadError}
         </div>
       ) : (
-        <RewriteClient posts={posts} currentYear={currentYear} viewsMap={viewsMap} gaConfigured={gaConfigured} />
+        <RewriteClient posts={posts} currentYear={currentYear} viewsMap={viewsMap} gaConfigured={gaConfigured} programs={programs} />
       )}
     </div>
   );
