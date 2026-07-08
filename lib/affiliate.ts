@@ -178,11 +178,22 @@ ${trackingPixels}
  */
 export async function replaceAffiliatePlaceholders(bodyMd: string): Promise<string> {
   const map = await buildAffiliateMap();
+  // プログラムID指定 [AFFILIATE:id:<uuid>] 用に、有効な全プログラムの id→row マップ
+  const allRows = await db.select({
+    id: affiliatePrograms.id, name: affiliatePrograms.name, htmlSnippet: affiliatePrograms.htmlSnippet,
+    themes: affiliatePrograms.themes, adType: affiliatePrograms.adType, priority: affiliatePrograms.priority,
+    strength: affiliatePrograms.strength,
+  }).from(affiliatePrograms).where(eq(affiliatePrograms.active, true));
+  const byId = new Map<string, AffiliateRow>();
+  for (const row of allRows) byId.set(row.id, { ...row, themes: (row.themes as string[]) ?? [] });
+
   // 同一広告の重複描画を防ぐ（同じプログラムは記事内で1回だけ表示）
   const usedPrograms = new Set<string>();
 
-  return bodyMd.replace(/\[AFFILIATE:([^\]]+)\]/g, (_, theme: string) => {
-    const row = map.get(theme.trim());
+  return bodyMd.replace(/\[AFFILIATE:([^\]]+)\]/g, (_, key: string) => {
+    const k = key.trim();
+    // id: 指定なら特定プログラム、それ以外はテーマで解決
+    const row = k.startsWith("id:") ? byId.get(k.slice(3).trim()) : map.get(k);
     if (!row) return "";
     if (usedPrograms.has(row.id)) return ""; // 2回目以降の同一広告は出さない
     usedPrograms.add(row.id);

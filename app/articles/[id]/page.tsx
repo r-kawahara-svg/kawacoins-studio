@@ -1,11 +1,11 @@
 import { db } from "@/db";
-import { articles, judgments, experiences as experiencesTable } from "@/db/schema";
+import { articles, judgments, experiences as experiencesTable, affiliatePrograms } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { marked } from "marked";
 import { notFound } from "next/navigation";
 import { JudgmentGate } from "./JudgmentGate";
 import { ExperienceForm } from "@/app/review/ExperienceForm";
-import { publishArticle } from "@/app/actions/articles";
+import { publishArticle, setArticleAffiliate } from "@/app/actions/articles";
 import { DeleteButton } from "./DeleteButton";
 import { RewriteButton } from "@/app/review/RewriteButton";
 import { PublishButton } from "@/app/review/PublishButton";
@@ -45,6 +45,25 @@ export default async function ArticlePage({
 
   // 充足判定: フィールド値を直接参照（completed フラグは副産物なので信用しない）
   const isGateComplete = !isTemplateArticle && judgment ? isJudgmentComplete(judgment) : false;
+
+  // この記事に入る広告（アフィリ）を解決
+  const affPrograms = await db.select({ id: affiliatePrograms.id, name: affiliatePrograms.name, themes: affiliatePrograms.themes })
+    .from(affiliatePrograms).where(eq(affiliatePrograms.active, true));
+  const affKey = article.bodyMd.match(/\[AFFILIATE:([^\]]+)\]/)?.[1]?.trim() ?? null;
+  let currentAffId = "";
+  let currentAffLabel = "未設定（広告なし）";
+  if (affKey) {
+    if (affKey.startsWith("id:")) {
+      const pid = affKey.slice(3).trim();
+      const p = affPrograms.find(x => x.id === pid);
+      currentAffId = pid;
+      currentAffLabel = p ? p.name : "（削除された広告）";
+    } else {
+      const p = affPrograms.find(x => ((x.themes as string[]) ?? []).includes(affKey));
+      currentAffId = p?.id ?? "";
+      currentAffLabel = p ? `${p.name}（テーマ:${affKey}）` : `テーマ「${affKey}」に該当する広告なし`;
+    }
+  }
 
   // Render markdown
   const markedBody = article.bodyMd
@@ -308,6 +327,28 @@ export default async function ArticlePage({
                 </form>
               </>
             )}
+          </div>
+
+          {/* この記事に入る広告（アフィリ）— 表示・変更 */}
+          <div style={{ background: "#fff", border: "1px solid #e3e6ea", borderRadius: 12, padding: "14px 16px", marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>この記事に入る広告</div>
+            <div style={{ fontSize: 12.5, color: currentAffId ? "#0f766b" : "#b0752e", background: currentAffId ? "#f1f7f5" : "#fbf6e9", border: `1px solid ${currentAffId ? "#cfe0dc" : "#ecdcb0"}`, borderRadius: 8, padding: "8px 11px", marginBottom: 10, lineHeight: 1.5 }}>
+              {currentAffLabel}
+            </div>
+            <form action={setArticleAffiliate} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input type="hidden" name="articleId" value={id} />
+              <select name="programId" defaultValue={currentAffId} required
+                style={{ flex: 1, minWidth: 150, border: "1px solid #dce1e8", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: "#1f2937", background: "#fff" }}>
+                <option value="" disabled>広告を選ぶ…</option>
+                {affPrograms.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <button type="submit" style={{ background: "#0f766b", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                この広告にする
+              </button>
+            </form>
+            <div style={{ fontSize: 11, color: "#9aa3af", marginTop: 8, lineHeight: 1.5 }}>
+              選んだ広告が公開時に本文へ入ります。違う場合はここで変更してください。
+            </div>
           </div>
 
           {/* X投稿文（コピペ用） */}

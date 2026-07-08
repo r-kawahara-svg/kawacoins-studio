@@ -47,7 +47,15 @@ export function replaceCtaBlocks(rawHtml: string, newCta: string): { html: strin
     aRe.lastIndex = block.end;
   }
   ranges.sort((a, b) => a.start - b.start);
-  if (ranges.length === 0) return { html, count: 0 };
+
+  // 既存CTAが無ければ、まとめ見出しの直前（無ければ末尾）に挿入する
+  if (ranges.length === 0) {
+    const mm = html.match(/<h2[^>]*>\s*まとめ/i);
+    if (mm && mm.index != null) {
+      return { html: html.slice(0, mm.index) + newCta + "\n" + html.slice(mm.index), count: 1 };
+    }
+    return { html: html + "\n" + newCta, count: 1 };
+  }
 
   let result = "", prev = 0;
   ranges.forEach((r, i) => {

@@ -36,6 +36,32 @@ export async function updateJudgment(formData: FormData) {
   revalidatePath(`/articles/${articleId}`);
 }
 
+// 記事に入れる広告（アフィリ）を選び直す。bodyMd の [AFFILIATE:*] を
+// [AFFILIATE:id:<programId>] に置換。無ければ「まとめ」直前に挿入する。
+export async function setArticleAffiliate(formData: FormData) {
+  const articleId = formData.get("articleId") as string;
+  const programId = formData.get("programId") as string;
+  if (!articleId || !programId) return;
+
+  const [article] = await db.select({ bodyMd: articles.bodyMd }).from(articles).where(eq(articles.id, articleId));
+  if (!article) return;
+
+  const tag = `[AFFILIATE:id:${programId}]`;
+  let body = article.bodyMd;
+  if (/\[AFFILIATE:[^\]]+\]/.test(body)) {
+    // 既存の広告プレースホルダを全て新しいものに置換（重複は公開時に1つへ整理される）
+    body = body.replace(/\[AFFILIATE:[^\]]+\]/g, tag);
+  } else {
+    // 無ければ「## まとめ」直前、無ければ末尾に挿入
+    const m = body.match(/\n#{2,3}\s*まとめ/);
+    if (m && m.index != null) body = body.slice(0, m.index) + `\n\n${tag}\n` + body.slice(m.index);
+    else body = body + `\n\n${tag}\n`;
+  }
+
+  await db.update(articles).set({ bodyMd: body }).where(eq(articles.id, articleId));
+  revalidatePath(`/articles/${articleId}`);
+}
+
 export async function publishArticle(formData: FormData) {
   const articleId = formData.get("articleId") as string;
   try {
