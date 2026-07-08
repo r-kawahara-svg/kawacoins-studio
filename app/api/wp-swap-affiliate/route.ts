@@ -4,54 +4,9 @@ import { affiliatePrograms } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getWpPost, updatePostContent } from "@/lib/wp";
 import { wrapAffiliate } from "@/lib/affiliate";
+import { replaceCtaBlocks } from "@/lib/cta-swap";
 
 export const dynamic = "force-dynamic";
-
-// <div ...> の対応閉じ位置を返す（入れ子対応）
-function balancedDivEnd(html: string, start: number): number {
-  const re = /<div\b|<\/div>/gi;
-  re.lastIndex = start;
-  let depth = 0, m: RegExpExecArray | null;
-  while ((m = re.exec(html))) {
-    if (m[0].toLowerCase().startsWith("</")) { depth--; if (depth === 0) return re.lastIndex; }
-    else depth++;
-  }
-  return -1;
-}
-
-// sponsoredリンクを内包する CTA ブロック(div)を先に全部特定し、
-// 先頭を newCta に、2つ目以降を削除（置換後の再走査で新CTAを消さないよう一括処理）。
-function replaceCtaBlocks(html: string, newCta: string): { html: string; count: number } {
-  const ranges: { start: number; end: number }[] = [];
-  const relRe = /rel="[^"]*sponsored[^"]*"/ig;
-  let m: RegExpExecArray | null;
-  while ((m = relRe.exec(html))) {
-    const linkIdx = m.index;
-    let start = -1, from = linkIdx;
-    while (true) {
-      const idx = html.lastIndexOf("<div", from);
-      if (idx === -1) break;
-      const end = balancedDivEnd(html, idx);
-      if (end > linkIdx) { start = idx; break; }
-      from = idx - 1;
-    }
-    if (start === -1) continue;
-    const end = balancedDivEnd(html, start);
-    if (end === -1) continue;
-    if (!ranges.some(r => r.start === start)) ranges.push({ start, end });
-    relRe.lastIndex = end; // このブロックを飛ばして次へ
-  }
-  ranges.sort((a, b) => a.start - b.start);
-  if (ranges.length === 0) return { html, count: 0 };
-
-  let result = "", prev = 0;
-  ranges.forEach((r, i) => {
-    result += html.slice(prev, r.start) + (i === 0 ? newCta : "");
-    prev = r.end;
-  });
-  result += html.slice(prev);
-  return { html: result, count: ranges.length };
-}
 
 export async function POST(req: NextRequest) {
   try {

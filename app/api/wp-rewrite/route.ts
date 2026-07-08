@@ -44,7 +44,10 @@ function stripDivContaining(html: string, marker: string, anchor: string): strin
 // 旧仕様の不要ブロックをまとめて除去
 function stripLegacyBlocks(html: string): string {
   // 運営者ボックス（テーマ側に著者情報があるため廃止）
-  return stripDivContaining(html, "運営者：カワコイン", "f7f8fa");
+  let out = stripDivContaining(html, "運営者：カワコイン", "f7f8fa");
+  // アフィリ開示文（不要）
+  out = out.replace(/<p[^>]*>[^<]*アフィリエイト(パートナー|プログラム)[^<]*<\/p>\s*/gi, "");
+  return out;
 }
 
 // WordPress の記事を直接読み込み、方針に沿って本文を書き直してWPに書き戻す。
