@@ -237,7 +237,7 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured, prog
                   <button
                     onClick={() => swapAffiliate(p.id)}
                     disabled={!affSel[p.id] || affRun[p.id]?.state === "running"}
-                    title="広告をこのアフィリに差し替え（記事全体はそのまま）"
+                    title={affRun[p.id]?.state === "error" ? (affRun[p.id]?.msg ?? "失敗") : "広告をこのアフィリに差し替え（記事全体はそのまま）"}
                     style={{
                       fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", height: 30, lineHeight: 1,
                       color: affRun[p.id]?.state === "done" ? "#0f766b" : affRun[p.id]?.state === "error" ? "#c4453a" : "#5b6470",
@@ -247,6 +247,9 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured, prog
                   >
                     {affRun[p.id]?.state === "running" ? "変更中…" : affRun[p.id]?.state === "done" ? "✓ 変更" : affRun[p.id]?.state === "error" ? "失敗" : "変更"}
                   </button>
+                  {affRun[p.id]?.state === "error" && affRun[p.id]?.msg && (
+                    <span style={{ fontSize: 10, color: "#c4453a", maxWidth: 160, whiteSpace: "normal", lineHeight: 1.3 }}>{affRun[p.id]!.msg}</span>
+                  )}
                 </span>
               )}
               {p.date && <span style={{ fontSize: 11, color: "#9ba8b5", fontFamily: "monospace", flexShrink: 0 }}>{p.date.slice(0, 10)}</span>}
