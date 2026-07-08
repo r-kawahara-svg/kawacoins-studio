@@ -114,6 +114,11 @@ a:not([class]) {
 input, textarea, select {
   font-size: max(16px, 1rem) !important;
 }
+/* 小型コントロール（一覧内のプルダウン等）はズーム防止対象外にして周囲と揃える */
+select.mini {
+  font-size: 11px !important;
+  height: 30px !important;
+}
 
 /* ─── 横スクロール隔離 ──────────────────────────────────── */
 .scroll-x {

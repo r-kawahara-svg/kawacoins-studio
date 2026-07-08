@@ -222,14 +222,16 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured, prog
               </button>
               {/* アフィリ差し替え（プルダウンで選択→CTAだけ差し替え） */}
               {programs.length > 0 && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                   <select
+                    className="mini"
                     value={affSel[p.id] ?? ""}
                     onChange={(e) => setAffSel((s) => ({ ...s, [p.id]: e.target.value }))}
                     disabled={affRun[p.id]?.state === "running"}
-                    style={{ fontSize: 11.5, border: "1px solid #d6dee0", borderRadius: 7, padding: "5px 6px", background: "#fff", color: "#374151", maxWidth: 130 }}
+                    title="差し替えるアフィリを選択"
+                    style={{ border: "1px solid #dce1e8", borderRadius: 7, padding: "0 6px", background: "#fff", color: "#5b6470", maxWidth: 116, cursor: "pointer" }}
                   >
-                    <option value="">アフィリ選択…</option>
+                    <option value="">広告を選択</option>
                     {programs.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
                   </select>
                   <button
@@ -237,13 +239,13 @@ export function RewriteClient({ posts, currentYear, viewsMap, gaConfigured, prog
                     disabled={!affSel[p.id] || affRun[p.id]?.state === "running"}
                     title="広告をこのアフィリに差し替え（記事全体はそのまま）"
                     style={{
-                      fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", minHeight: 32,
+                      fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", height: 30, lineHeight: 1,
                       color: affRun[p.id]?.state === "done" ? "#0f766b" : affRun[p.id]?.state === "error" ? "#c4453a" : "#5b6470",
-                      background: "#f2f5f4", border: "1px solid #d6dee0", borderRadius: 7, padding: "5px 9px",
+                      background: "#f2f5f4", border: "1px solid #dce1e8", borderRadius: 7, padding: "0 10px",
                       cursor: !affSel[p.id] ? "not-allowed" : "pointer",
                     }}
                   >
-                    {affRun[p.id]?.state === "running" ? "変更中…" : affRun[p.id]?.state === "done" ? "✓ 変更" : affRun[p.id]?.state === "error" ? "失敗" : "広告変更"}
+                    {affRun[p.id]?.state === "running" ? "変更中…" : affRun[p.id]?.state === "done" ? "✓ 変更" : affRun[p.id]?.state === "error" ? "失敗" : "変更"}
                   </button>
                 </span>
               )}

@@ -19,29 +19,38 @@ function balancedDivEnd(html: string, start: number): number {
   return -1;
 }
 
-// sponsoredリンクを内包する CTA ブロック(div)を newCta に差し替える。2つ目以降の重複は削除。
+// sponsoredリンクを内包する CTA ブロック(div)を先に全部特定し、
+// 先頭を newCta に、2つ目以降を削除（置換後の再走査で新CTAを消さないよう一括処理）。
 function replaceCtaBlocks(html: string, newCta: string): { html: string; count: number } {
-  let result = html, count = 0, guard = 0;
-  const relRe = /rel="[^"]*sponsored[^"]*"/i;
-  while (guard++ < 12) {
-    const m = result.search(relRe);
-    if (m === -1) break;
-    // リンクを内包する最も内側の <div を探す
-    let start = -1, from = m;
+  const ranges: { start: number; end: number }[] = [];
+  const relRe = /rel="[^"]*sponsored[^"]*"/ig;
+  let m: RegExpExecArray | null;
+  while ((m = relRe.exec(html))) {
+    const linkIdx = m.index;
+    let start = -1, from = linkIdx;
     while (true) {
-      const idx = result.lastIndexOf("<div", from);
+      const idx = html.lastIndexOf("<div", from);
       if (idx === -1) break;
-      const end = balancedDivEnd(result, idx);
-      if (end > m) { start = idx; break; }
+      const end = balancedDivEnd(html, idx);
+      if (end > linkIdx) { start = idx; break; }
       from = idx - 1;
     }
-    if (start === -1) break;
-    const end = balancedDivEnd(result, start);
-    if (end === -1) break;
-    result = result.slice(0, start) + (count === 0 ? newCta : "") + result.slice(end);
-    count++;
+    if (start === -1) continue;
+    const end = balancedDivEnd(html, start);
+    if (end === -1) continue;
+    if (!ranges.some(r => r.start === start)) ranges.push({ start, end });
+    relRe.lastIndex = end; // このブロックを飛ばして次へ
   }
-  return { html: result, count };
+  ranges.sort((a, b) => a.start - b.start);
+  if (ranges.length === 0) return { html, count: 0 };
+
+  let result = "", prev = 0;
+  ranges.forEach((r, i) => {
+    result += html.slice(prev, r.start) + (i === 0 ? newCta : "");
+    prev = r.end;
+  });
+  result += html.slice(prev);
+  return { html: result, count: ranges.length };
 }
 
 export async function POST(req: NextRequest) {
